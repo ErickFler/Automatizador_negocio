@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div><p class="eyebrow">Consulta local</p><h1>Histórico de cargas</h1></div>
+    <a class="button button-primary" href="/">Nueva carga</a>
+  </section>
+  <section class="panel">
+    {% if batches %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Lote</th><th>Fecha</th><th>Sucursal</th><th>Archivo</th><th>Filas</th><th>Incidencias</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {% for batch in batches %}
+              <tr>
+                <td>#{{ batch.id }}</td>
+                <td>{{ batch.sales_date.strftime('%d/%m/%Y') }}</td>
+                <td>{{ batch.branch }}</td>
+                <td>{{ batch.source_filename }}</td>
+                <td>{{ batch.valid_rows }} / {{ batch.total_rows }}</td>
+                <td>{{ batch.warning_rows }}</td>
+                <td><span class="badge {{ 'badge-success' if batch.status.startswith('COMPLETED') else 'badge-error' }}">{{ batch.status }}</span></td>
+                <td>{% if batch.status.startswith('COMPLETED') %}<a href="/history/{{ batch.id }}/export">Exportar</a>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state"><h2>Aún no hay cargas</h2><p>Procesa tu primer reporte para comenzar el histórico.</p></div>
+    {% endif %}
+  </section>
+{% endblock %}
+

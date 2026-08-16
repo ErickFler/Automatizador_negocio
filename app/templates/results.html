@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Operación {{ sales_date.strftime('%d/%m/%Y') }}</p>
+      <h1>Resultado del procesamiento</h1>
+    </div>
+    <a class="button button-secondary" href="/">Nueva carga</a>
+  </section>
+
+  <section class="metrics" aria-label="Resumen de la operación">
+    <article><span>Archivos procesados</span><strong>{{ summary.processed_files }}</strong></article>
+    <article><span>Registros leídos</span><strong>{{ summary.total_rows }}</strong></article>
+    <article><span>Registros guardados</span><strong>{{ summary.valid_rows }}</strong></article>
+    <article><span>Incidencias</span><strong>{{ summary.warnings }}</strong></article>
+    <article><span>Productos nuevos</span><strong>{{ summary.new_products }}</strong></article>
+    <article><span>Cantidad registrada</span><strong>{{ summary.quantity }}</strong></article>
+    <article><span>Unidades reales</span><strong>{{ summary.real_units }}</strong></article>
+    <article><span>Unidades combo</span><strong>{{ summary.combo_units }}</strong></article>
+    <article class="metric-money"><span>Importe total</span><strong>${{ summary.total_amount }}</strong></article>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">
+      <div>
+        <h2>Archivos recibidos</h2>
+        <p>Cada archivo se procesa como un lote independiente.</p>
+      </div>
+      {% if export_filename %}
+        <a class="button button-primary" href="/exports/{{ export_filename }}">Descargar concentrado</a>
+      {% endif %}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Archivo</th><th>Sucursal</th><th>Estado</th><th>Detalle</th></tr></thead>
+        <tbody>
+          {% for outcome in outcomes %}
+            <tr>
+              <td>{{ outcome.filename }}</td>
+              <td>{{ outcome.branch }}</td>
+              <td><span class="badge {{ 'badge-success' if outcome.successful else 'badge-error' }}">{{ 'Procesado' if outcome.successful else 'No procesado' }}</span></td>
+              <td>{{ outcome.message }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="bottom-actions">
+    <a class="button button-secondary" href="/history">Ver histórico</a>
+    <a class="button button-secondary" href="/products">Catálogo de productos</a>
+  </div>
+{% endblock %}
+

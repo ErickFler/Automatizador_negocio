@@ -1,0 +1,30 @@
+.venv/
+.build-venv/
+.env
+.env.local
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.DS_Store
+*.log
+*.tmp
+*.temp
+*.swp
+*~
+
+# Local runtime data
+data/app.db
+data/app.db-*
+data/uploads/*
+data/exports/*
+data/logs/*
+
+# Keep runtime directories in Git
+!data/uploads/.gitkeep
+!data/exports/.gitkeep
+!data/logs/.gitkeep

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Apagando · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="shutdown-panel panel">
+    <div class="shutdown-icon">{{ '✓' if shutdown_started else '!' }}</div>
+    <p class="eyebrow">Sistema local</p>
+    <h1>{{ 'Apagando sistema' if shutdown_started else 'No fue posible apagar' }}</h1>
+    <p>{{ message }}</p>
+    {% if shutdown_started %}
+      <p>Cuando esta página deje de responder, puedes cerrar la pestaña.</p>
+    {% else %}
+      <a class="button button-primary" href="/">Volver a la aplicación</a>
+    {% endif %}
+  </section>
+{% endblock %}
+
