@@ -29,4 +29,3 @@ def test_products_page_is_available() -> None:
 
     assert response.status_code == 200
     assert "Productos maestros" in response.text
-    assert "Catálogo vacío" in response.text

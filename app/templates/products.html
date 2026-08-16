@@ -31,7 +31,15 @@
                 <td><strong>{{ item.master_product.display_name }}</strong></td>
                 <td>{{ item.master_product.category.display_name }}</td>
                 {% for branch in branches %}
-                  <td>{{ item.equivalences_by_branch[branch.name] }}</td>
+                  <td>
+                    {% if item.equivalences_by_branch[branch.name] %}
+                      {% for local_product in item.equivalences_by_branch[branch.name] %}
+                        <div>{{ local_product.original_product_name }}</div>
+                      {% endfor %}
+                    {% else %}
+                      <span aria-label="Sin equivalencia">—</span>
+                    {% endif %}
+                  </td>
                 {% endfor %}
                 <td>{{ item.total_equivalences }}</td>
                 <td>{{ 'Activo' if item.master_product.active else 'Inactivo' }}</td>

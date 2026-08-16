@@ -112,10 +112,11 @@ def test_valid_upload_shows_result_and_minimal_history(
 
     assert response.status_code == 200
     assert "Archivo procesado" in response.text
-    assert "Completada" in response.text
+    assert "Productos por confirmar" in response.text
+    assert "Confirmar productos" in response.text
     assert "Loma Linda" in response.text
     assert "Hash" not in response.text
-    assert session.scalar(select(ImportBatch)).status == "COMPLETED"
+    assert session.scalar(select(ImportBatch)).status == "WAITING_FOR_PRODUCT_MAPPING"
 
     history = client.get("/imports")
     assert history.status_code == 200
@@ -128,6 +129,19 @@ def test_upload_with_invalid_value_shows_friendly_issue(
     client, session = web_client
     branch = session.scalar(select(Branch).where(Branch.name == "Alianza"))
     assert branch is not None
+    category, _ = get_or_create_category(session, display_name="BEBIDAS")
+    master = create_master_product(
+        session, display_name="Refresco", category=category
+    )
+    create_branch_product(
+        session,
+        branch=branch,
+        external_product_id="139",
+        original_product_name="REFRESCO",
+        original_category_name="BEBIDAS",
+        master_product=master,
+    )
+    session.commit()
     content = _workbook_bytes(
         [["BEBIDAS", 139, "REFRESCO", 2, "ERROR", 20, 40, 86]]
     )
@@ -142,6 +156,75 @@ def test_upload_with_invalid_value_shows_friendly_issue(
     assert "Completada con incidencias" in response.text
     assert "PrecioVenta no contiene un número válido" in response.text
     assert "ERROR" not in response.text
+
+
+def test_mapping_screen_can_confirm_an_existing_product(
+    web_client: tuple[TestClient, Session],
+) -> None:
+    client, session = web_client
+    branch = session.scalar(select(Branch).where(Branch.name == "Loma Linda"))
+    assert branch is not None
+    category, _ = get_or_create_category(session, display_name="Bebidas")
+    master = create_master_product(
+        session, display_name="Coca Cola 3 L", category=category
+    )
+    session.commit()
+    content = _workbook_bytes(
+        [["BEBIDAS", 344, "REFRESCO COCA COLA 3 LTS", 1, 50, 20, 50, 50]]
+    )
+    client.post(
+        "/imports",
+        data={"sales_date": "2026-08-10", "branch_id": str(branch.id)},
+        files={"file": ("loma.xlsx", content)},
+    )
+    batch = session.scalar(select(ImportBatch))
+    assert batch is not None
+
+    mapping_page = client.get(f"/imports/{batch.id}/products")
+    response = client.post(
+        f"/imports/{batch.id}/products/map",
+        data={"external_product_id": "344", "master_product_id": str(master.id)},
+    )
+
+    assert mapping_page.status_code == 200
+    assert "Confirmar productos nuevos" in mapping_page.text
+    assert "Coca Cola 3 L" in mapping_page.text
+    assert response.status_code == 200
+    assert "Todos los productos están confirmados" in response.text
+    assert session.get(ImportBatch, batch.id).status == "COMPLETED"
+
+
+def test_mapping_screen_can_create_a_new_product(
+    web_client: tuple[TestClient, Session],
+) -> None:
+    client, session = web_client
+    branch = session.scalar(select(Branch).where(Branch.name == "Unidad"))
+    assert branch is not None
+    content = _workbook_bytes(
+        [["POSTRES", 900, "PASTEL CHOCOLATE", 1, 80, 30, 80, 80]]
+    )
+    client.post(
+        "/imports",
+        data={"sales_date": "2026-08-11", "branch_id": str(branch.id)},
+        files={"file": ("unidad.xlsx", content)},
+    )
+    batch = session.scalar(select(ImportBatch))
+    assert batch is not None
+
+    response = client.post(
+        f"/imports/{batch.id}/products/create",
+        data={
+            "external_product_id": "900",
+            "master_display_name": "Pastel de Chocolate",
+            "category_display_name": "Postres",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Todos los productos están confirmados" in response.text
+    products = client.get("/products")
+    assert "Pastel de Chocolate" in products.text
+    assert "PASTEL CHOCOLATE" in products.text
 
 
 def test_products_page_shows_master_product_and_equivalences_by_branch(

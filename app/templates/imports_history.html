@@ -19,7 +19,12 @@
                 <td>{{ batch.sales_date.strftime('%d/%m/%Y') }}</td>
                 <td>{{ batch.branch.name }}</td>
                 <td>{{ batch.source_filename }}</td>
-                <td>{{ status_labels[batch.status] }}</td>
+                <td>
+                  {{ status_labels[batch.status] }}
+                  {% if batch.status == 'WAITING_FOR_PRODUCT_MAPPING' %}
+                    · <a href="/imports/{{ batch.id }}/products">Continuar</a>
+                  {% endif %}
+                </td>
                 <td>{{ batch.total_rows }}</td>
               </tr>
             {% endfor %}

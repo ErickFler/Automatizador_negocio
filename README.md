@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1 y 2** están activas:
+Las **Etapas 0, 1, 2 y 3** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -18,11 +18,15 @@ Las **Etapas 0, 1 y 2** están activas:
 - incidencias básicas de estructura y contenido;
 - detección de duplicados por fecha, sucursal y archivo;
 - historial mínimo de cargas en `/imports`.
+- detección de productos locales todavía desconocidos;
+- sugerencias deterministas y búsqueda manual de productos existentes;
+- confirmación persistente de equivalencias por sucursal;
+- creación manual y confirmada de productos maestros;
+- auditoría de cambios de nombre y categoría recibidos.
 
-La homologación, cálculos, consolidación, reportes analíticos, exportación,
-launcher y empaquetado permanecen fuera del flujo activo hasta sus etapas
-correspondientes. Algunos archivos del prototipo se conservan congelados como
-referencia.
+Los cálculos, consolidación, reportes analíticos, exportación, launcher y
+empaquetado permanecen fuera del flujo activo hasta sus etapas correspondientes.
+Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
 
@@ -76,3 +80,11 @@ La carga de Etapa 2 conserva el valor recibido en cada columna confirmada y el
 número de fila del Excel. Una incidencia no elimina la fila ni convierte valores
 inválidos en cero. La importación no crea productos y no calcula unidades
 cobradas ni unidades combo.
+
+## Homologación
+
+Una carga con IDs locales desconocidos queda en “Productos por confirmar”. El
+usuario puede relacionar cada producto con uno existente o crear un producto
+maestro nuevo. La decisión se guarda por sucursal e ID local, por lo que futuras
+cargas reutilizan la equivalencia sin volver a preguntar. Las sugerencias nunca
+crean relaciones automáticamente.

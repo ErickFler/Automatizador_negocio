@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar productos · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  {% if not batch %}
+    <section class="panel empty-state"><h1>Carga no encontrada</h1></section>
+  {% else %}
+    <section class="hero compact">
+      <div>
+        <p class="eyebrow">Confirmación de productos</p>
+        <h1>Confirmar productos nuevos</h1>
+        <p class="hero-copy">Encontramos productos que todavía no conocemos. Ayúdanos a indicar cuáles son para recordarlos en futuras cargas.</p>
+      </div>
+      {% if current %}<div class="status-pill">{{ current_position }} de {{ total_products }}</div>{% endif %}
+    </section>
+
+    {% if saved %}<div class="alert alert-success" role="status">Producto confirmado y guardado correctamente.</div>{% endif %}
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+
+    {% if current %}
+      <section class="panel">
+        <div class="form-heading">
+          <div>
+            <p class="eyebrow">{{ batch.branch.name }}</p>
+            <h2>{{ current.original_product_name }}</h2>
+            <p>Código: {{ current.external_product_id }} · Categoría recibida: {{ current.original_category_name or 'Sin categoría' }}</p>
+            {% if current.row_count > 1 %}<p>Aparece en {{ current.row_count }} filas de este archivo.</p>{% endif %}
+          </div>
+        </div>
+
+        <h3>Posibles coincidencias</h3>
+        {% if suggestions %}
+          <form action="/imports/{{ batch.id }}/products/map" method="post">
+            <input type="hidden" name="external_product_id" value="{{ current.external_product_id }}">
+            <div class="candidate-list">
+              {% for candidate in suggestions %}
+                <label class="candidate-option">
+                  <input type="radio" name="master_product_id" value="{{ candidate.master_product.id }}" required>
+                  <span><strong>{{ candidate.master_product.display_name }}</strong><br>{{ candidate.master_product.category.display_name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            <button class="button button-primary" type="submit">Relacionar producto</button>
+          </form>
+        {% else %}
+          <div class="empty-state"><p>No encontramos un producto similar.</p></div>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Buscar otro producto existente</h2>
+        <form action="/imports/{{ batch.id }}/products" method="get" class="search-form">
+          <label><span>Buscar producto</span><input type="search" name="search" value="{{ search }}" placeholder="Ej. coca cola"></label>
+          <button class="button button-secondary" type="submit">Buscar</button>
+        </form>
+        {% if search and not manual_results %}<p>No encontramos productos con esa búsqueda.</p>{% endif %}
+        {% if manual_results %}
+          <form action="/imports/{{ batch.id }}/products/map" method="post">
+            <input type="hidden" name="external_product_id" value="{{ current.external_product_id }}">
+            <div class="candidate-list">
+              {% for product in manual_results %}
+                <label class="candidate-option">
+                  <input type="radio" name="master_product_id" value="{{ product.id }}" required>
+                  <span><strong>{{ product.display_name }}</strong><br>{{ product.category.display_name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            <button class="button button-primary" type="submit">Relacionar producto</button>
+          </form>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <h2>Crear producto nuevo</h2>
+        <form action="/imports/{{ batch.id }}/products/create" method="post" class="upload-form">
+          <input type="hidden" name="external_product_id" value="{{ current.external_product_id }}">
+          <label><span>Nombre maestro</span><input type="text" name="master_display_name" value="{{ current.original_product_name }}" required></label>
+          <label><span>Categoría</span><input type="text" name="category_display_name" value="{{ current.original_category_name or '' }}" required></label>
+          <button class="button button-primary" type="submit">Crear y relacionar</button>
+        </form>
+      </section>
+    {% else %}
+      <section class="panel empty-state">
+        <h2>Todos los productos están confirmados</h2>
+        <p>Las decisiones quedaron guardadas para futuras cargas.</p>
+        <a class="button button-primary" href="/imports">Volver a cargas</a>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

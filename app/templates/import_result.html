@@ -21,6 +21,14 @@
     <article><span>Filas con incidencias</span><strong>{{ batch.warning_rows }}</strong></article>
   </section>
 
+  {% if batch.status == 'WAITING_FOR_PRODUCT_MAPPING' %}
+    <section class="panel empty-state">
+      <h2>Encontramos productos que todavía no conocemos</h2>
+      <p>Ayúdanos a indicar cuáles son para recordarlos en futuras cargas.</p>
+      <a class="button button-primary" href="/imports/{{ batch.id }}/products">Confirmar productos</a>
+    </section>
+  {% endif %}
+
   {% if batch.processing_issues %}
     <section class="panel">
       <h2>Incidencias encontradas</h2>

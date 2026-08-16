@@ -18,10 +18,16 @@ from app.db.models import (
 from app.services.duplicate_service import DuplicateImportError
 from app.services.excel_reader import REQUIRED_COLUMNS
 from app.services.file_storage import calculate_sha256
+from app.services.product_catalog import (
+    create_branch_product,
+    create_master_product,
+    get_or_create_category,
+)
 from app.services.raw_import_service import (
     COMPLETED,
     COMPLETED_WITH_WARNINGS,
     FAILED,
+    WAITING_FOR_PRODUCT_MAPPING,
     import_raw_sales_file,
 )
 
@@ -63,6 +69,31 @@ def _valid_rows() -> list[list[object]]:
     ]
 
 
+def _seed_known_product(
+    session: Session,
+    *,
+    external_product_id: str,
+    name: str,
+    category_name: str,
+    branch_name: str = "Loma Linda",
+) -> None:
+    category, _ = get_or_create_category(session, display_name=category_name)
+    master = create_master_product(
+        session,
+        display_name=f"{name} {external_product_id}",
+        category=category,
+    )
+    create_branch_product(
+        session,
+        branch=_branch(session, branch_name),
+        external_product_id=external_product_id,
+        original_product_name=name,
+        original_category_name=category_name,
+        master_product=master,
+    )
+    session.commit()
+
+
 def _import(
     session: Session,
     path: Path,
@@ -87,7 +118,18 @@ def test_valid_workbook_creates_completed_batch_and_preserves_file(
 ) -> None:
     source = _workbook(tmp_path / f"ventas{extension}", _valid_rows())
     upload_directory = tmp_path / "uploads"
-
+    _seed_known_product(
+        session,
+        external_product_id="139",
+        name="REFRESCO",
+        category_name="BEBIDAS",
+    )
+    _seed_known_product(
+        session,
+        external_product_id="140",
+        name="PAPA",
+        category_name="ALIMENTOS",
+    )
     result = _import(session, source, upload_directory)
     batch = session.get(ImportBatch, result.batch_id)
 
@@ -189,8 +231,8 @@ def test_duplicate_is_rejected_but_other_branch_and_date_are_allowed(
         session, source, uploads, sales_date=date(2026, 8, 9)
     )
 
-    assert other_branch.status == COMPLETED
-    assert other_date.status == COMPLETED
+    assert other_branch.status == WAITING_FOR_PRODUCT_MAPPING
+    assert other_date.status == WAITING_FOR_PRODUCT_MAPPING
     assert session.scalar(select(func.count(ImportBatch.id))) == 3
 
 
@@ -225,6 +267,18 @@ def test_invalid_numeric_row_is_preserved_and_creates_issue(
         ["ALIMENTOS", 140, "PAPA", 3, 49, 15, 45, 147],
     ]
     source = _workbook(tmp_path / "incidencia.xlsx", rows)
+    _seed_known_product(
+        session,
+        external_product_id="139",
+        name="REFRESCO",
+        category_name="BEBIDAS",
+    )
+    _seed_known_product(
+        session,
+        external_product_id="140",
+        name="PAPA",
+        category_name="ALIMENTOS",
+    )
 
     result = _import(session, source, tmp_path / "uploads")
     invalid_record = session.scalar(
@@ -256,6 +310,7 @@ def test_import_does_not_create_products_or_calculate_units(
 
     assert session.scalar(select(func.count(MasterProduct.id))) == 0
     assert session.scalar(select(func.count(BranchProduct.id))) == 0
+    assert session.scalar(select(ImportBatch.status)) == WAITING_FOR_PRODUCT_MAPPING
     raw_columns = set(RawSaleRecord.__table__.columns.keys())
     assert "real_units" not in raw_columns
     assert "combo_units" not in raw_columns

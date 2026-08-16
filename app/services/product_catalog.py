@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from typing import Never
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Branch, BranchProduct, Category, MasterProduct
@@ -11,29 +10,11 @@ from app.domain.normalization import clean_display_text, normalize_for_compariso
 @dataclass(frozen=True, slots=True)
 class ProductInspectionRow:
     master_product: MasterProduct
-    equivalences_by_branch: dict[str, int]
+    equivalences_by_branch: dict[str, tuple[BranchProduct, ...]]
 
     @property
     def total_equivalences(self) -> int:
-        return sum(self.equivalences_by_branch.values())
-
-
-@dataclass(frozen=True, slots=True)
-class CatalogWarning:
-    """Tipo conservado únicamente para que el pipeline futuro siga importable."""
-
-    external_product_id: str
-    warning_type: str
-    description: str
-    previous_values: dict[str, str | None]
-    new_values: dict[str, str | None]
-
-
-def register_product(*_: object, **__: object) -> Never:
-    """Impide que el pipeline anterior cree productos sin homologación."""
-    raise RuntimeError(
-        "La creación automática de productos está deshabilitada hasta la Etapa 3."
-    )
+        return sum(len(items) for items in self.equivalences_by_branch.values())
 
 
 def get_or_create_category(
@@ -122,24 +103,21 @@ def list_products_for_inspection(session: Session) -> list[ProductInspectionRow]
         select(MasterProduct).order_by(MasterProduct.normalized_name)
     ).all()
     branches = session.scalars(select(Branch).order_by(Branch.id)).all()
-    counts = session.execute(
-        select(
-            BranchProduct.master_product_id,
-            Branch.name,
-            func.count(BranchProduct.id),
-        )
-        .join(Branch, Branch.id == BranchProduct.branch_id)
-        .group_by(BranchProduct.master_product_id, Branch.name)
+    branch_products = session.scalars(
+        select(BranchProduct).order_by(BranchProduct.original_product_name)
     ).all()
-    count_lookup = {
-        (master_product_id, branch_name): count
-        for master_product_id, branch_name, count in counts
-    }
+    equivalence_lookup: dict[tuple[int, int], list[BranchProduct]] = {}
+    for branch_product in branch_products:
+        equivalence_lookup.setdefault(
+            (branch_product.master_product_id, branch_product.branch_id), []
+        ).append(branch_product)
     return [
         ProductInspectionRow(
             master_product=product,
             equivalences_by_branch={
-                branch.name: count_lookup.get((product.id, branch.name), 0)
+                branch.name: tuple(
+                    equivalence_lookup.get((product.id, branch.id), [])
+                )
                 for branch in branches
             },
         )

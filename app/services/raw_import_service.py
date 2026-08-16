@@ -3,15 +3,18 @@ from datetime import date, datetime
 import logging
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import DATA_ROOT
 from app.db.models import (
     Branch,
+    BranchProduct,
     ImportBatch,
     ProcessingIssue,
     RawSaleRecord,
 )
+from app.domain.normalization import normalize_for_comparison
 from app.services.duplicate_service import ensure_import_is_not_duplicate
 from app.services.excel_reader import (
     ExcelValidationError,
@@ -26,6 +29,7 @@ PENDING = "PENDING"
 PROCESSING = "PROCESSING"
 COMPLETED = "COMPLETED"
 COMPLETED_WITH_WARNINGS = "COMPLETED_WITH_WARNINGS"
+WAITING_FOR_PRODUCT_MAPPING = "WAITING_FOR_PRODUCT_MAPPING"
 FAILED = "FAILED"
 
 WARNING = "WARNING"
@@ -111,9 +115,16 @@ def import_raw_sales_file(
     try:
         issue_rows: set[int] = set()
         issue_count = 0
+        unknown_external_ids: set[str] = set()
         warnings_by_row: dict[int, list[ExcelWarning]] = {}
         for warning in read_result.warnings:
             warnings_by_row.setdefault(warning.row_number, []).append(warning)
+        known_products = {
+            product.external_product_id: product
+            for product in session.scalars(
+                select(BranchProduct).where(BranchProduct.branch_id == branch.id)
+            ).all()
+        }
 
         with session.begin_nested():
             for row in read_result.rows:
@@ -152,10 +163,37 @@ def import_raw_sales_file(
                     issue_rows.add(row.source_row_number)
                     issue_count += 1
 
+                external_id = (row.external_product_id or "").strip()
+                known_product = known_products.get(external_id)
+                if external_id and known_product is None:
+                    unknown_external_ids.add(external_id)
+                elif known_product is not None:
+                    change_issues = _known_product_change_issues(
+                        row_product_name=row.product_name,
+                        row_category_name=row.category_name,
+                        known_product=known_product,
+                    )
+                    for issue_type, message in change_issues:
+                        session.add(
+                            ProcessingIssue(
+                                import_batch=batch,
+                                raw_sale_record=raw_record,
+                                source_row_number=row.source_row_number,
+                                issue_type=issue_type,
+                                severity=WARNING,
+                                message=message,
+                            )
+                        )
+                        issue_rows.add(row.source_row_number)
+                        issue_count += 1
+
             batch.total_rows = read_result.total_rows
             batch.valid_rows = read_result.total_rows - len(issue_rows)
             batch.warning_rows = len(issue_rows)
-            batch.status = COMPLETED_WITH_WARNINGS if issue_count else COMPLETED
+            if unknown_external_ids:
+                batch.status = WAITING_FOR_PRODUCT_MAPPING
+            else:
+                batch.status = COMPLETED_WITH_WARNINGS if issue_count else COMPLETED
             batch.error_message = None
 
         session.commit()
@@ -228,3 +266,35 @@ def _severity_for(issue_type: str) -> str:
     }:
         return ERROR
     return WARNING
+
+
+def _known_product_change_issues(
+    *,
+    row_product_name: str | None,
+    row_category_name: str | None,
+    known_product: BranchProduct,
+) -> list[tuple[str, str]]:
+    issues: list[tuple[str, str]] = []
+    if (
+        row_product_name
+        and normalize_for_comparison(row_product_name)
+        != known_product.normalized_product_name
+    ):
+        issues.append(
+            (
+                "BRANCH_PRODUCT_NAME_CHANGED",
+                "El nombre recibido es diferente del nombre previamente confirmado "
+                "para este producto local.",
+            )
+        )
+    if normalize_for_comparison(row_category_name or "") != normalize_for_comparison(
+        known_product.original_category_name or ""
+    ):
+        issues.append(
+            (
+                "BRANCH_PRODUCT_CATEGORY_CHANGED",
+                "La categoría recibida es diferente de la categoría previamente "
+                "confirmada para este producto local.",
+            )
+        )
+    return issues
