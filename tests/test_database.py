@@ -14,6 +14,9 @@ def test_initial_tables_are_created() -> None:
         "categories",
         "master_products",
         "branch_products",
+        "import_batches",
+        "raw_sale_records",
+        "processing_issues",
     }.issubset(table_names)
     assert "products" not in table_names
 

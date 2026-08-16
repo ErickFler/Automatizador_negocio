@@ -107,6 +107,14 @@ class BranchProduct(TimestampMixin, Base):
 
 class ImportBatch(Base):
     __tablename__ = "import_batches"
+    __table_args__ = (
+        UniqueConstraint(
+            "sales_date",
+            "branch_id",
+            "sha256",
+            name="uq_import_batches_date_branch_sha256",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sales_date: Mapped[date] = mapped_column(Date, index=True)
@@ -115,19 +123,51 @@ class ImportBatch(Base):
     )
     source_filename: Mapped[str] = mapped_column(String(255))
     stored_filename: Mapped[str] = mapped_column(String(255), unique=True)
-    file_sha256: Mapped[str] = mapped_column(String(64), index=True)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     total_rows: Mapped[int] = mapped_column(Integer, default=0)
     valid_rows: Mapped[int] = mapped_column(Integer, default=0)
     warning_rows: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(40), default="PENDING", index=True)
+    error_message: Mapped[str | None] = mapped_column(Text)
 
     branch: Mapped[Branch] = relationship(back_populates="import_batches")
+    raw_sale_records: Mapped[list["RawSaleRecord"]] = relationship(
+        back_populates="import_batch", cascade="all, delete-orphan"
+    )
+    processing_issues: Mapped[list["ProcessingIssue"]] = relationship(
+        back_populates="import_batch", cascade="all, delete-orphan"
+    )
     sale_records: Mapped[list["SaleRecord"]] = relationship(
         back_populates="batch", cascade="all, delete-orphan"
     )
-    warnings: Mapped[list["ProcessingWarning"]] = relationship(
-        back_populates="batch", cascade="all, delete-orphan"
+
+
+class RawSaleRecord(Base):
+    __tablename__ = "raw_sale_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    import_batch_id: Mapped[int] = mapped_column(
+        ForeignKey("import_batches.id"), index=True, nullable=False
+    )
+    source_row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    original_category_name: Mapped[str | None] = mapped_column(Text)
+    external_product_id: Mapped[str | None] = mapped_column(Text)
+    original_product_name: Mapped[str | None] = mapped_column(Text)
+    quantity_raw: Mapped[str | None] = mapped_column(Text)
+    sale_price_raw: Mapped[str | None] = mapped_column(Text)
+    cost_raw: Mapped[str | None] = mapped_column(Text)
+    amount_raw: Mapped[str | None] = mapped_column(Text)
+    total_amount_raw: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+    import_batch: Mapped[ImportBatch] = relationship(
+        back_populates="raw_sale_records"
+    )
+    processing_issues: Mapped[list["ProcessingIssue"]] = relationship(
+        back_populates="raw_sale_record", cascade="all, delete-orphan"
     )
 
 
@@ -158,17 +198,25 @@ class SaleRecord(Base):
     branch: Mapped[Branch] = relationship(back_populates="sale_records")
 
 
-class ProcessingWarning(Base):
-    __tablename__ = "processing_warnings"
+class ProcessingIssue(Base):
+    __tablename__ = "processing_issues"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    batch_id: Mapped[int] = mapped_column(ForeignKey("import_batches.id"), index=True)
-    row_number: Mapped[int | None] = mapped_column(Integer)
-    product_id: Mapped[str | None] = mapped_column(String(100))
-    product_name: Mapped[str | None] = mapped_column(String(255))
-    warning_type: Mapped[str] = mapped_column(String(80), index=True)
-    description: Mapped[str] = mapped_column(Text)
-    original_values: Mapped[str | None] = mapped_column(Text)
+    import_batch_id: Mapped[int] = mapped_column(
+        ForeignKey("import_batches.id"), index=True, nullable=False
+    )
+    raw_sale_record_id: Mapped[int | None] = mapped_column(
+        ForeignKey("raw_sale_records.id"), index=True
+    )
+    source_row_number: Mapped[int | None] = mapped_column(Integer)
+    issue_type: Mapped[str] = mapped_column(String(80), index=True)
+    severity: Mapped[str] = mapped_column(String(20), index=True)
+    message: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
-    batch: Mapped[ImportBatch] = relationship(back_populates="warnings")
+    import_batch: Mapped[ImportBatch] = relationship(
+        back_populates="processing_issues"
+    )
+    raw_sale_record: Mapped[RawSaleRecord | None] = relationship(
+        back_populates="processing_issues"
+    )

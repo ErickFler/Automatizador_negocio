@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado de la carga · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">Resultado</p>
+      <h1>Archivo procesado</h1>
+      <p class="hero-copy">{{ batch.source_filename }}</p>
+    </div>
+    <a class="button button-secondary" href="/imports/new">Cargar otro archivo</a>
+  </section>
+
+  <section class="summary-grid">
+    <article><span>Fecha</span><strong>{{ batch.sales_date.strftime('%d/%m/%Y') }}</strong></article>
+    <article><span>Sucursal</span><strong>{{ batch.branch.name }}</strong></article>
+    <article><span>Estado</span><strong>{{ status_labels[batch.status] }}</strong></article>
+    <article><span>Total de filas</span><strong>{{ batch.total_rows }}</strong></article>
+    <article><span>Filas sin incidencias</span><strong>{{ batch.valid_rows }}</strong></article>
+    <article><span>Filas con incidencias</span><strong>{{ batch.warning_rows }}</strong></article>
+  </section>
+
+  {% if batch.processing_issues %}
+    <section class="panel">
+      <h2>Incidencias encontradas</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fila</th><th>Producto</th><th>Problema</th></tr></thead>
+          <tbody>
+            {% for issue in batch.processing_issues %}
+              <tr>
+                <td>{{ issue.source_row_number or 'Archivo' }}</td>
+                <td>{{ issue.raw_sale_record.original_product_name if issue.raw_sale_record else '—' }}</td>
+                <td>{{ issue.message }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.db.models import ImportBatch, ProcessingWarning, SaleRecord
+from app.db.models import ImportBatch, ProcessingIssue as ProcessingWarning, SaleRecord
 from app.domain.calculations import calculate_units
 from app.services.duplicate_service import ensure_import_is_not_duplicate
 from app.services.excel_reader import ExcelSaleRow, ExcelWarning, read_sales_excel

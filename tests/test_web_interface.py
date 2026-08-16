@@ -1,14 +1,19 @@
 from collections.abc import Generator
+from io import BytesIO
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.db.database import Base, get_db, seed_branches
-from app.db.models import Branch
+from app.api import pages
+from app.db.models import Branch, ImportBatch
 from app.main import app
+from app.services.excel_reader import REQUIRED_COLUMNS
 from app.services.product_catalog import (
     create_branch_product,
     create_master_product,
@@ -17,7 +22,9 @@ from app.services.product_catalog import (
 
 
 @pytest.fixture
-def web_client() -> Generator[tuple[TestClient, Session], None, None]:
+def web_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Generator[tuple[TestClient, Session], None, None]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -31,13 +38,25 @@ def web_client() -> Generator[tuple[TestClient, Session], None, None]:
         yield session
 
     app.dependency_overrides[get_db] = override_database
+    monkeypatch.setattr(pages, "UPLOAD_DIRECTORY", tmp_path / "uploads")
     with TestClient(app) as client:
         yield client, session
     app.dependency_overrides.clear()
     session.close()
 
 
-def test_home_only_exposes_stage_one_navigation(
+def _workbook_bytes(rows: list[list[object]]) -> bytes:
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(list(REQUIRED_COLUMNS))
+    for row in rows:
+        worksheet.append(row)
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def test_home_exposes_raw_import_navigation(
     web_client: tuple[TestClient, Session],
 ) -> None:
     client, _ = web_client
@@ -46,9 +65,83 @@ def test_home_only_exposes_stage_one_navigation(
 
     assert response.status_code == 200
     assert "Sistema de Concentrado de Ventas" in response.text
-    assert "Ver productos" in response.text
+    assert "Cargar ventas" in response.text
     assert 'action="/uploads"' not in response.text
     assert "Apagar sistema" not in response.text
+
+
+def test_import_form_lists_only_active_persistent_branches(
+    web_client: tuple[TestClient, Session],
+) -> None:
+    client, session = web_client
+    session.add(Branch(name="Sucursal inactiva", active=False))
+    session.commit()
+
+    response = client.get("/imports/new")
+
+    assert response.status_code == 200
+    for branch_name in ("Loma Linda", "Solidaridad", "Alianza", "Unidad"):
+        assert branch_name in response.text
+    assert "Sucursal inactiva" not in response.text
+    assert 'name="sales_date"' in response.text
+    assert 'name="branch_id"' in response.text
+    assert 'name="file"' in response.text
+
+
+def test_valid_upload_shows_result_and_minimal_history(
+    web_client: tuple[TestClient, Session],
+) -> None:
+    client, session = web_client
+    branch = session.scalar(select(Branch).where(Branch.name == "Loma Linda"))
+    assert branch is not None
+    content = _workbook_bytes(
+        [["BEBIDAS", 139, "REFRESCO", 2, 43, 20, 40, 86]]
+    )
+
+    response = client.post(
+        "/imports",
+        data={"sales_date": "2026-08-08", "branch_id": str(branch.id)},
+        files={
+            "file": (
+                "ventas.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Archivo procesado" in response.text
+    assert "Completada" in response.text
+    assert "Loma Linda" in response.text
+    assert "Hash" not in response.text
+    assert session.scalar(select(ImportBatch)).status == "COMPLETED"
+
+    history = client.get("/imports")
+    assert history.status_code == 200
+    assert "ventas.xlsx" in history.text
+
+
+def test_upload_with_invalid_value_shows_friendly_issue(
+    web_client: tuple[TestClient, Session],
+) -> None:
+    client, session = web_client
+    branch = session.scalar(select(Branch).where(Branch.name == "Alianza"))
+    assert branch is not None
+    content = _workbook_bytes(
+        [["BEBIDAS", 139, "REFRESCO", 2, "ERROR", 20, 40, 86]]
+    )
+
+    response = client.post(
+        "/imports",
+        data={"sales_date": "2026-08-09", "branch_id": str(branch.id)},
+        files={"file": ("incidencia.xlsx", content)},
+    )
+
+    assert response.status_code == 200
+    assert "Completada con incidencias" in response.text
+    assert "PrecioVenta no contiene un número válido" in response.text
+    assert "ERROR" not in response.text
 
 
 def test_products_page_shows_master_product_and_equivalences_by_branch(

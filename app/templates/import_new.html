@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Cargar ventas · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">Nueva carga</p>
+      <h1>Cargar ventas</h1>
+      <p class="hero-copy">Selecciona manualmente la fecha y la sucursal del reporte.</p>
+    </div>
+  </section>
+
+  {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+
+  <form class="panel upload-form" action="/imports" method="post" enctype="multipart/form-data">
+    <div class="upload-list">
+      <div class="upload-card">
+        <label>
+          <span>Fecha de ventas</span>
+          <input type="date" name="sales_date" required>
+        </label>
+        <label>
+          <span>Sucursal</span>
+          <select name="branch_id" required>
+            <option value="">Selecciona una sucursal</option>
+            {% for branch in branches %}<option value="{{ branch.id }}">{{ branch.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="file-field">
+          <span>Archivo Excel</span>
+          <input type="file" name="file" accept=".xlsx,.xlsm" required>
+        </label>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="button button-primary" type="submit">Procesar archivo</button>
+    </div>
+  </form>
+{% endblock %}

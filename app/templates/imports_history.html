@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Cargas · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="hero compact">
+    <div><p class="eyebrow">Consulta local</p><h1>Historial de cargas</h1></div>
+    <a class="button button-primary" href="/imports/new">Nueva carga</a>
+  </section>
+
+  <section class="panel">
+    {% if batches %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Sucursal</th><th>Archivo</th><th>Estado</th><th>Filas</th></tr></thead>
+          <tbody>
+            {% for batch in batches %}
+              <tr>
+                <td>{{ batch.sales_date.strftime('%d/%m/%Y') }}</td>
+                <td>{{ batch.branch.name }}</td>
+                <td>{{ batch.source_filename }}</td>
+                <td>{{ status_labels[batch.status] }}</td>
+                <td>{{ batch.total_rows }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state"><h2>Aún no hay cargas</h2><p>Procesa el primer reporte para comenzar.</p></div>
+    {% endif %}
+  </section>
+{% endblock %}

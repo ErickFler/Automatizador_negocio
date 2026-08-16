@@ -18,7 +18,7 @@ from app.db.models import (
     Category,
     ImportBatch,
     MasterProduct as Product,
-    ProcessingWarning,
+    ProcessingIssue as ProcessingWarning,
     SaleRecord,
 )
 from app.domain.normalization import PENDING_CATEGORY_NAME

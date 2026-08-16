@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0 y 1** están activas:
+Las **Etapas 0, 1 y 2** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -13,10 +13,16 @@ Las **Etapas 0 y 1** están activas:
 - productos maestros independientes de los IDs externos;
 - equivalencias de producto por sucursal;
 - página de inspección del catálogo en `/products`.
+- carga manual de reportes `.xlsx` y `.xlsm` en `/imports/new`;
+- preservación del archivo original, SHA-256 y todas las filas crudas;
+- incidencias básicas de estructura y contenido;
+- detección de duplicados por fecha, sucursal y archivo;
+- historial mínimo de cargas en `/imports`.
 
-La carga de Excel, cálculos, consolidación, exportación, launcher y empaquetado
-permanecen fuera del flujo activo hasta sus etapas correspondientes. Algunos
-archivos del prototipo se conservan congelados como referencia.
+La homologación, cálculos, consolidación, reportes analíticos, exportación,
+launcher y empaquetado permanecen fuera del flujo activo hasta sus etapas
+correspondientes. Algunos archivos del prototipo se conservan congelados como
+referencia.
 
 ## Requisitos
 
@@ -63,3 +69,10 @@ se relaciona con un producto maestro. La combinación `branch_id` más
 `external_product_id` es única.
 
 Un producto maestro puede tener múltiples equivalencias de distintas sucursales.
+
+## Importación cruda
+
+La carga de Etapa 2 conserva el valor recibido en cada columna confirmada y el
+número de fila del Excel. Una incidencia no elimina la fila ni convierte valores
+inválidos en cero. La importación no crea productos y no calcula unidades
+cobradas ni unidades combo.
