@@ -9,7 +9,13 @@ def test_initial_tables_are_created() -> None:
     initialize_database()
 
     table_names = set(inspect(engine).get_table_names())
-    assert "branches" in table_names
+    assert {
+        "branches",
+        "categories",
+        "master_products",
+        "branch_products",
+    }.issubset(table_names)
+    assert "products" not in table_names
 
 
 def test_four_expected_branches_are_seeded() -> None:

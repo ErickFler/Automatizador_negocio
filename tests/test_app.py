@@ -22,3 +22,11 @@ def test_health_endpoint() -> None:
         "application": "Sistema de Concentrado de Ventas",
     }
 
+
+def test_products_page_is_available() -> None:
+    with TestClient(app) as client:
+        response = client.get("/products")
+
+    assert response.status_code == 200
+    assert "Productos maestros" in response.text
+    assert "Catálogo vacío" in response.text

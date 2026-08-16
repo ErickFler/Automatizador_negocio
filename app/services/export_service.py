@@ -14,7 +14,13 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import DATA_ROOT
-from app.db.models import Category, ImportBatch, ProcessingWarning, Product, SaleRecord
+from app.db.models import (
+    Category,
+    ImportBatch,
+    MasterProduct as Product,
+    ProcessingWarning,
+    SaleRecord,
+)
 from app.domain.normalization import PENDING_CATEGORY_NAME
 from app.services.consolidation_service import (
     ConsolidationFilters,

@@ -3,31 +3,48 @@
 {% block title %}Productos · Concentrado de Ventas{% endblock %}
 
 {% block content %}
-  <section class="page-heading">
-    <div><p class="eyebrow">Catálogo maestro</p><h1>Productos</h1></div>
-    <a class="button button-primary" href="/">Nueva carga</a>
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">Inspección del catálogo</p>
+      <h1>Productos maestros</h1>
+      <p class="hero-copy">Cada equivalencia representa cómo aparece el producto en una sucursal.</p>
+    </div>
+    <a class="button button-secondary" href="/">Volver al inicio</a>
   </section>
+
   <section class="panel">
     {% if products %}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>IDProducto</th><th>Producto</th><th>Categoría</th><th>Estado</th><th>Fecha de alta</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Producto maestro</th>
+              <th>Categoría</th>
+              {% for branch in branches %}<th>{{ branch.name }}</th>{% endfor %}
+              <th>Total equivalencias</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
           <tbody>
-            {% for product in products %}
+            {% for item in products %}
               <tr>
-                <td>{{ product.external_product_id }}</td>
-                <td>{{ product.original_name }}</td>
-                <td>{{ product.category.name if product.category else 'Pendiente de clasificar' }}</td>
-                <td><span class="badge {{ 'badge-success' if product.active else '' }}">{{ 'Activo' if product.active else 'Inactivo' }}</span></td>
-                <td>{{ product.created_at.strftime('%d/%m/%Y') }}</td>
+                <td><strong>{{ item.master_product.display_name }}</strong></td>
+                <td>{{ item.master_product.category.display_name }}</td>
+                {% for branch in branches %}
+                  <td>{{ item.equivalences_by_branch[branch.name] }}</td>
+                {% endfor %}
+                <td>{{ item.total_equivalences }}</td>
+                <td>{{ 'Activo' if item.master_product.active else 'Inactivo' }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     {% else %}
-      <div class="empty-state"><h2>Catálogo vacío</h2><p>Los productos se agregarán automáticamente durante las cargas.</p></div>
+      <div class="empty-state">
+        <h2>Catálogo vacío</h2>
+        <p>Los productos maestros se crearán mediante el flujo correspondiente en una etapa posterior.</p>
+      </div>
     {% endif %}
   </section>
 {% endblock %}
-

@@ -1,14 +1,22 @@
 # Sistema de Concentrado de Ventas
 
-Aplicación web local para concentrar reportes Excel de ventas de varias sucursales.
+Aplicación web local para construir un histórico confiable de ventas de cuatro
+sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0 a 8** dejan preparada la base técnica, el catálogo maestro, la
-lectura segura, las reglas de cálculo, la persistencia transaccional y el
-consolidado histórico con exportación Excel e interfaz web local. Cada venta queda
-vinculada con su lote, producto, fecha, sucursal, archivo y fila de origen. Las
-incidencias también permanecen en SQLite.
+Las **Etapas 0 y 1** están activas:
+
+- fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
+- sucursales persistentes con seed idempotente;
+- categorías maestras;
+- productos maestros independientes de los IDs externos;
+- equivalencias de producto por sucursal;
+- página de inspección del catálogo en `/products`.
+
+La carga de Excel, cálculos, consolidación, exportación, launcher y empaquetado
+permanecen fuera del flujo activo hasta sus etapas correspondientes. Algunos
+archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
 
@@ -23,26 +31,20 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[dev]'
 ```
 
-La configuración disponible está documentada en `.env.example`. Para cambiarla:
-
-```bash
-cp .env.example .env
-```
+La configuración disponible está documentada en `.env.example`.
 
 ## Ejecución
-
-Con el entorno virtual activo:
 
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 Abrir <http://127.0.0.1:8000>. El diagnóstico está disponible en
-<http://127.0.0.1:8000/health>.
+<http://127.0.0.1:8000/health> y el catálogo en
+<http://127.0.0.1:8000/products>.
 
-Durante el desarrollo, la base se crea en `data/app.db` y los logs se escriben en
-`data/logs/app.log`. En la aplicación empaquetada para Windows, los datos se
-guardan en `%LOCALAPPDATA%\ConcentradoVentas`.
+La base de desarrollo se crea en `data/app.db` y los logs se escriben en
+`data/logs/app.log`. Ambos son archivos locales ignorados por Git.
 
 ## Pruebas
 
@@ -50,89 +52,14 @@ guardan en `%LOCALAPPDATA%\ConcentradoVentas`.
 pytest
 ```
 
-## Estructura
+Las pruebas de servicios pertenecientes a etapas futuras se mantienen congeladas
+en sus archivos hasta adaptar esos servicios a la arquitectura V2.
 
-```text
-app/
-  core/          Configuración y logging
-  db/            Conexión y modelos SQLAlchemy
-  domain/        Normalización y futuras reglas de negocio
-  services/      Servicios de catálogo y futuros procesos
-  static/        CSS y futuros recursos del navegador
-  templates/     Plantillas HTML
-  main.py        Aplicación FastAPI y endpoints iniciales
-data/
-  exports/       Archivos generados en etapas posteriores
-  logs/          Logs locales
-  uploads/       Copias de archivos cargados en etapas posteriores
-tests/           Pruebas automatizadas
-```
+## Modelo de productos
 
-## Próximas etapas
+`MasterProduct` representa el producto universal y no contiene un ID externo.
+`BranchProduct` conserva el ID y los nombres recibidos dentro de una sucursal y
+se relaciona con un producto maestro. La combinación `branch_id` más
+`external_product_id` es única.
 
-El empaquetado como ejecutable se implementará por separado en la etapa final.
-
-## Formato de entrada preparado
-
-El lector admite `.xlsx` y `.xlsm` con estos encabezados exactos:
-
-`NombreCategoria`, `IDProducto`, `NombreProducto`, `Cantidad`, `PrecioVenta`,
-`Costo`, `Importe` e `ImporteTotal`.
-
-## Reglas de cálculo aprobadas
-
-```text
-UnidadesReales = ImporteTotal / PrecioVenta
-UnidadesCombo = Cantidad - UnidadesReales
-```
-
-Los resultados no enteros, negativos o inconsistentes se conservan y generan
-advertencias. `Costo` e `Importe` no intervienen en estas fórmulas.
-
-## Persistencia y duplicados
-
-El procesamiento de cada archivo crea un `ImportBatch` y persiste sus
-`SaleRecord` e incidencias de manera transaccional. Una combinación repetida de
-SHA-256, fecha y sucursal se rechaza antes de copiar o insertar nuevamente el
-archivo. Una falla inesperada revierte productos y ventas parciales y marca el
-lote como `FAILED`.
-
-## Consolidado
-
-El histórico se agrupa en SQLite por fecha, sucursal, categoría, ID de producto y
-producto. Se suman Cantidad, UnidadesReales, UnidadesCombo e ImporteTotal. Los
-lotes fallidos se excluyen y los totales completamente desconocidos permanecen
-como `NULL`, sin convertirse artificialmente en cero.
-
-## Exportación Excel
-
-La exportación genera un archivo `.xlsx` nuevo con las hojas `Concentrado`,
-`Detalle`, `Incidencias` y `Productos Nuevos`. Incluye encabezados destacados,
-filtros, fila superior congelada, anchos limitados y formatos de fechas, cantidades
-y moneda. Las exportaciones existentes no se sobrescriben.
-
-## Interfaz web
-
-La pantalla principal permite seleccionar una fecha y asociar entre uno y cuatro
-archivos con sucursales distintas. Después del procesamiento muestra resultados,
-totales e incidencias y permite descargar el concentrado. Las vistas de histórico
-y catálogo muestran la información almacenada localmente.
-
-Los nombres de las cuatro sucursales se configuran con `APP_BRANCHES`, separados
-por comas.
-
-## Inicio y apagado local
-
-En macOS, después de instalar las dependencias, se puede iniciar con doble clic en
-`Iniciar Sistema.command`. El launcher espera a que FastAPI responda y abre
-automáticamente `http://127.0.0.1:8000`. Si el sistema ya está activo, reutiliza la
-instancia existente.
-
-El botón `Apagar sistema` solicita un cierre limpio del servidor. Si la aplicación
-se inició manualmente con Uvicorn, el botón informa que debe utilizarse el launcher.
-
-## Empaquetado para Windows
-
-La configuración de PyInstaller, los metadatos del ejecutable y los scripts de
-Inno Setup se encuentran en `packaging/windows`. La compilación final debe hacerse
-y probarse en Windows; consulta `packaging/windows/README.md`.
+Un producto maestro puede tener múltiples equivalencias de distintas sucursales.

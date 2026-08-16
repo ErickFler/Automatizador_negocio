@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Category, ImportBatch, Product, SaleRecord
+from app.db.models import Category, ImportBatch, MasterProduct as Product, SaleRecord
 from app.domain.normalization import PENDING_CATEGORY_NAME
 from app.services.sales_processor import COMPLETED, COMPLETED_WITH_WARNINGS
 

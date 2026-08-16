@@ -1,75 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Nueva carga · Concentrado de Ventas{% endblock %}
+{% block title %}Inicio · Concentrado de Ventas{% endblock %}
 
 {% block content %}
   <section class="hero">
     <div>
-      <p class="eyebrow">Nueva operación</p>
+      <p class="eyebrow">Sistema local</p>
       <h1>Sistema de Concentrado de Ventas</h1>
-      <p class="hero-copy">Selecciona la fecha y asocia cada reporte Excel con su sucursal.</p>
+      <p class="hero-copy">La fundación y el catálogo maestro están disponibles para inspección.</p>
     </div>
     <div class="status-pill"><span></span> Aplicación funcionando correctamente</div>
   </section>
 
-  {% if error %}
-    <div class="alert alert-error" role="alert">{{ error }}</div>
-  {% endif %}
-
-  <form class="panel upload-form" action="/uploads" method="post" enctype="multipart/form-data" id="upload-form">
-    <div class="form-heading">
-      <div>
-        <h2>Reportes de ventas</h2>
-        <p>Puedes procesar de una a cuatro sucursales en la misma operación.</p>
-      </div>
-      <label class="date-field">
-        <span>Fecha de venta</span>
-        <input type="date" name="sales_date" value="{{ today }}" required>
-      </label>
-    </div>
-
-    <div id="upload-list" class="upload-list" data-max-files="4">
-      <div class="upload-card" data-upload-card>
-        <div class="upload-number">1</div>
-        <label>
-          <span>Sucursal</span>
-          <select name="branches" required>
-            <option value="">Selecciona una sucursal</option>
-            {% for branch in branches %}<option value="{{ branch }}">{{ branch }}</option>{% endfor %}
-          </select>
-        </label>
-        <label class="file-field">
-          <span>Archivo Excel</span>
-          <input type="file" name="files" accept=".xlsx,.xlsm" required>
-        </label>
-        <button class="icon-button remove-upload" type="button" aria-label="Eliminar archivo" hidden>×</button>
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button class="button button-secondary" type="button" id="add-upload">+ Agregar otra sucursal</button>
-      <button class="button button-primary" type="submit" id="submit-upload">Procesar reportes</button>
-    </div>
-  </form>
-
-  <template id="upload-template">
-    <div class="upload-card" data-upload-card>
-      <div class="upload-number"></div>
-      <label>
-        <span>Sucursal</span>
-        <select name="branches" required>
-          <option value="">Selecciona una sucursal</option>
-          {% for branch in branches %}<option value="{{ branch }}">{{ branch }}</option>{% endfor %}
-        </select>
-      </label>
-      <label class="file-field">
-        <span>Archivo Excel</span>
-        <input type="file" name="files" accept=".xlsx,.xlsm" required>
-      </label>
-      <button class="icon-button remove-upload" type="button" aria-label="Eliminar archivo">×</button>
-    </div>
-  </template>
+  <section class="panel empty-state">
+    <h2>Catálogo maestro de productos</h2>
+    <p>Consulta los productos universales y sus equivalencias registradas por sucursal.</p>
+    <a class="button button-primary" href="/products">Ver productos</a>
+  </section>
 {% endblock %}
-
-{% block scripts %}<script src="{{ url_for('static', path='/js/uploads.js') }}" defer></script>{% endblock %}
-
