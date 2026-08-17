@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.pages import router as pages_router
 from app.api.reports import router as reports_router
+from app.api.costs import router as costs_router
 from app.core.config import RESOURCE_ROOT, settings
 from app.core.logging import configure_logging, get_logger
 from app.db.database import initialize_database
@@ -25,6 +26,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=RESOURCE_ROOT / "app" / "static"), name="static")
 app.include_router(pages_router)
 app.include_router(reports_router)
+app.include_router(costs_router)
 
 
 @app.get("/health")

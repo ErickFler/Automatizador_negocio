@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Historial de costo{% endblock %}
+{% block content %}
+  {% if not product %}<section class="panel empty-state"><h1>Producto no encontrado</h1></section>{% else %}
+    <section class="report-heading"><a class="back-link" href="/costs">← Volver a Costos</a><h1>{{ product.display_name }}</h1><p>{{ product.category.display_name }} · Costo oficial histórico.</p></section>
+    {% if warning %}<div class="alert alert-error">{{ warning }}</div>{% endif %}
+    <section class="panel cost-current"><form method="get"><label>Costo vigente al<input type="date" name="effective_on" value="{{ reference_date.isoformat() }}"></label><button class="button button-secondary" type="submit">Consultar fecha</button></form><div><span>Costo vigente</span>{% if effective_cost %}<strong>{{ effective_cost.cost|money }}</strong><p>Vigente desde {{ effective_cost.effective_from|date_mx }}</p>{% else %}<strong class="missing-value">No disponible</strong><p>No existe un costo anterior o igual a esta fecha.</p>{% endif %}</div></section>
+    <section class="panel report-table"><h2>Historial de costos</h2>{% if history %}<div class="table-wrap"><table><thead><tr><th>Fecha de vigencia</th><th class="number-cell">Costo</th><th>Fuente</th><th>Fecha de carga</th></tr></thead><tbody>{% for row in history %}<tr><td>{{ row.effective_from|date_mx }}</td><td class="number-cell">{{ row.cost|money }}</td><td>{{ row.source_filename or 'Registro manual' }}</td><td>{{ row.imported_at.strftime('%d/%m/%Y %H:%M') }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><h2>Este producto todavía no tiene costos oficiales.</h2></div>{% endif %}</section>
+  {% endif %}
+{% endblock %}

@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3, 4, 5, 6 y 7** están activas:
+Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7 y 8** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -43,9 +43,14 @@ Las **Etapas 0, 1, 2, 3, 4, 5, 6 y 7** están activas:
   y comparativo de sucursales;
 - detalle individual de producto con equivalencias, evolución y cambios de
   precio observados.
+- costos oficiales históricos asociados exclusivamente a productos maestros;
+- importación trazable de costos desde Excel, con vigencia, homologación manual
+  y detección de conflictos;
+- consulta de costo vigente, historial y productos todavía sin costo.
 
-El constructor libre de reportes, costos administrados, exportación, launcher y
-empaquetado permanecen fuera del flujo activo hasta sus etapas correspondientes.
+Rentabilidad, utilidad, margen, el constructor libre de reportes, exportación,
+launcher y empaquetado permanecen fuera del flujo activo hasta sus etapas
+correspondientes.
 Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
@@ -175,3 +180,25 @@ Los históricos semanal y mensual rellenan periodos sin ventas con cero. El
 comparativo incluye siempre las cuatro sucursales activas. Las vistas muestran
 un resumen explícito de filtros, avisan cuando existen incidencias o cargas por
 homologar y nunca incorporan filas crudas sin `SaleRecord` en sus métricas.
+
+## Costos oficiales históricos
+
+`ProductCost` pertenece a `MasterProduct` y es común para las cuatro sucursales.
+Cada registro tiene una fecha de vigencia. Para una venta se utiliza el costo
+más reciente cuya vigencia sea anterior o igual a la fecha de venta; si no
+existe, el costo oficial se considera no disponible. Los costos futuros, cero
+implícito, `SaleRecord.original_cost` y el precio de venta nunca se usan como
+sustitutos.
+
+La importación en `/costs/import` acepta archivos `.xlsx` o `.xlsm`. La primera
+hoja debe contener las columnas `Producto` y `Costo`; también se aceptan los
+encabezados `Nombre Producto` y `Costo unitario`. La fecha de vigencia se elige
+en la pantalla y no forma parte del archivo. El mapeo se mantiene concentrado en
+`CostExcelMapping`, por lo que puede ajustarse cuando exista un formato real.
+
+Una coincidencia exacta por nombre normalizado puede relacionarse de forma
+automática. Los demás nombres quedan pendientes para relacionarlos con un
+producto maestro existente u omitirlos. El archivo original y su SHA-256 se
+conservan en `data/cost_uploads/`; un archivo repetido para la misma vigencia y
+un costo repetido para el mismo producto y fecha generan conflicto, nunca una
+sobrescritura silenciosa.

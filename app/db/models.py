@@ -76,6 +76,9 @@ class MasterProduct(TimestampMixin, Base):
     sale_records: Mapped[list["SaleRecord"]] = relationship(
         back_populates="master_product"
     )
+    product_costs: Mapped[list["ProductCost"]] = relationship(
+        back_populates="master_product"
+    )
 
 
 class BranchProduct(TimestampMixin, Base):
@@ -249,4 +252,87 @@ class ProcessingIssue(Base):
     )
     raw_sale_record: Mapped[RawSaleRecord | None] = relationship(
         back_populates="processing_issues"
+    )
+
+
+class CostImportBatch(Base):
+    __tablename__ = "cost_import_batches"
+    __table_args__ = (
+        UniqueConstraint(
+            "effective_from", "sha256", name="uq_cost_import_date_sha256"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    effective_from: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    stored_filename: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    status: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    total_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    imported_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    warning_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    rows: Mapped[list["CostImportRow"]] = relationship(
+        back_populates="batch", cascade="all, delete-orphan"
+    )
+    product_costs: Mapped[list["ProductCost"]] = relationship(
+        back_populates="import_batch"
+    )
+
+
+class CostImportRow(Base):
+    __tablename__ = "cost_import_rows"
+    __table_args__ = (
+        UniqueConstraint(
+            "cost_import_batch_id", "source_row_number", name="uq_cost_import_row"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cost_import_batch_id: Mapped[int] = mapped_column(
+        ForeignKey("cost_import_batches.id"), index=True, nullable=False
+    )
+    source_row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    original_product_name: Mapped[str | None] = mapped_column(Text)
+    normalized_product_name: Mapped[str] = mapped_column(String(255), index=True, default="")
+    cost_raw: Mapped[str | None] = mapped_column(Text)
+    parsed_cost: Mapped[Decimal | None] = mapped_column(Numeric(28, 12))
+    master_product_id: Mapped[int | None] = mapped_column(
+        ForeignKey("master_products.id"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    message: Mapped[str | None] = mapped_column(Text)
+
+    batch: Mapped[CostImportBatch] = relationship(back_populates="rows")
+    master_product: Mapped[MasterProduct | None] = relationship()
+
+
+class ProductCost(Base):
+    __tablename__ = "product_costs"
+    __table_args__ = (
+        UniqueConstraint(
+            "master_product_id", "effective_from", name="uq_product_cost_effective"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    master_product_id: Mapped[int] = mapped_column(
+        ForeignKey("master_products.id"), index=True, nullable=False
+    )
+    effective_from: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    cost: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    source_filename: Mapped[str | None] = mapped_column(String(255))
+    cost_import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cost_import_batches.id"), index=True
+    )
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    master_product: Mapped[MasterProduct] = relationship(back_populates="product_costs")
+    import_batch: Mapped[CostImportBatch | None] = relationship(
+        back_populates="product_costs"
     )

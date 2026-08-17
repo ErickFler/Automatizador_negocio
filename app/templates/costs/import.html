@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Importar costos{% endblock %}
+{% block content %}
+  <section class="report-heading"><a class="back-link" href="/costs">← Volver a Costos</a><h1>Importar costos</h1><p>Los costos quedarán vigentes desde la fecha indicada y se conservará el archivo original.</p></section>
+  {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+  <form class="panel cost-import-form" action="/costs/import" method="post" enctype="multipart/form-data">
+    <label><span>Fecha desde la que aplican estos costos</span><input type="date" name="effective_from" required></label>
+    <label><span>Archivo Excel</span><input type="file" name="file" accept=".xlsx,.xlsm" required></label>
+    <button class="button button-primary" type="submit">Procesar costos</button>
+  </form>
+  <section class="panel cost-format-help"><h2>Formato esperado</h2><p>La primera hoja debe contener una fila de encabezados y las columnas:</p><div class="format-example"><strong>Producto</strong><strong>Costo</strong><span>Ensalada de col</span><span>12.50</span></div><p>También se aceptan “Nombre Producto” y “Costo unitario”. No agregue fechas ni sucursales dentro del archivo: la vigencia se selecciona arriba y el costo es común para las cuatro sucursales.</p></section>
+{% endblock %}

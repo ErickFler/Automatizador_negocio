@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Resultado de costos{% endblock %}
+{% block content %}
+  <section class="report-heading"><a class="back-link" href="/costs">← Volver a Costos</a><h1>Resultado de la importación</h1>{% if batch %}<p>{{ batch.source_filename }} · Vigencia {{ batch.effective_from|date_mx }}</p>{% endif %}</section>
+  {% if not batch %}<section class="panel empty-state"><h2>Carga no encontrada</h2></section>{% else %}
+    {% if batch.status == 'FAILED' %}<div class="alert alert-error" role="alert"><strong>No se pudo procesar el archivo.</strong> {{ batch.error_message }}</div>{% endif %}
+    {% if batch.status == 'WAITING_FOR_PRODUCT_MAPPING' %}<div class="dashboard-notice dashboard-notice-warning"><div><strong>Hay productos por confirmar.</strong><br>Los costos no se guardarán hasta resolverlos u omitirlos.</div><a href="/costs/imports/{{ batch.id }}/products">Confirmar productos</a></div>{% endif %}
+    <section class="cost-result-cards"><article><span>Productos procesados</span><strong>{{ batch.total_rows }}</strong></article><article><span>Costos guardados</span><strong>{{ batch.imported_rows }}</strong></article><article><span>Productos por confirmar</span><strong>{{ batch.rows|selectattr('status', 'equalto', 'PENDING_MAPPING')|list|length }}</strong></article><article><span>Advertencias</span><strong>{{ batch.warning_rows }}</strong></article></section>
+    {% if batch.rows %}<section class="panel report-table"><h2>Detalle de filas</h2><div class="table-wrap"><table><thead><tr><th>Fila</th><th>Producto recibido</th><th>Producto maestro</th><th class="number-cell">Costo</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>{% for row in batch.rows|sort(attribute='source_row_number') %}<tr><td>{{ row.source_row_number }}</td><td>{{ row.original_product_name or 'Vacío' }}</td><td>{{ row.master_product.display_name if row.master_product else 'Sin relacionar' }}</td><td class="number-cell">{{ row.parsed_cost|money if row.parsed_cost is not none else 'No disponible' }}</td><td><span class="badge">{{ row.status }}</span></td><td>{{ row.message or '—' }}</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+    <div class="bottom-actions"><a class="button button-primary" href="/costs/import">Importar otro archivo</a><a class="button button-secondary" href="/costs">Ver costos</a></div>
+  {% endif %}
+{% endblock %}

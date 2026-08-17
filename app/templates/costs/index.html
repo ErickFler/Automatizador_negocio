@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Costos oficiales{% endblock %}
+{% block content %}
+  <section class="dashboard-heading"><div><p class="eyebrow">Administración histórica</p><h1>Costos oficiales</h1><p class="period-heading">Costos comunes para todas las sucursales.</p></div><a class="button button-primary button-prominent" href="/costs/import">Importar costos</a></section>
+  {% if warning %}<div class="alert alert-error" role="alert">{{ warning }}</div>{% endif %}
+  <section class="cost-coverage" aria-label="Cobertura de costos">
+    <article><span>Productos con costo vigente</span><strong>{{ products_with_cost }}</strong></article>
+    <article><span>Productos sin costo vigente</span><strong>{{ products_without_cost }}</strong></article>
+  </section>
+  <section class="panel cost-filters"><form method="get" class="filter-grid">
+    <label>Costo vigente al<input type="date" name="effective_on" value="{{ reference_date.isoformat() }}"></label>
+    <label>Buscar producto<input type="search" name="search" value="{{ search }}" placeholder="Ej. Ensalada de col"></label>
+    <label class="checkbox-filter"><input type="checkbox" name="missing_only" value="true" {% if missing_only %}checked{% endif %}><span>Solo productos sin costo</span></label>
+    <div class="filter-actions"><button class="button button-primary" type="submit">Aplicar filtros</button></div>
+  </form></section>
+  <section class="panel report-table"><div class="section-title simple-title"><div><h2>Costos al {{ reference_date|date_mx }}</h2><p>El costo oficial proviene de este módulo, no del reporte de ventas.</p></div></div>
+    {% if rows %}<div class="table-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="number-cell">Costo vigente</th><th>Vigente desde</th><th>Historial</th></tr></thead><tbody>
+      {% for row in rows %}<tr><td><strong>{{ row.product.display_name }}</strong></td><td>{{ row.product.category.display_name }}</td><td class="number-cell">{% if row.effective_cost %}{{ row.effective_cost.cost|money }}{% else %}<span class="missing-value">No disponible</span>{% endif %}</td><td>{% if row.effective_cost %}{{ row.effective_cost.effective_from|date_mx }}{% else %}—{% endif %}</td><td><a href="/costs/products/{{ row.product.id }}?effective_on={{ reference_date.isoformat() }}">Ver historial</a></td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="empty-state"><h2>No encontramos productos con estos filtros.</h2></div>{% endif %}
+  </section>
+{% endblock %}
