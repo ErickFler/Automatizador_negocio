@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0 a 11** están activas:
+Las **Etapas 0 a 12** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -57,9 +57,11 @@ Las **Etapas 0 a 11** están activas:
   advertencias consistentes con la pantalla.
 - manejo comprensible de errores HTTP, revisión visual y validación integral
   del flujo desde una base nueva hasta la exportación.
+- launcher local con health check, apertura automática del navegador, instancia
+  única y apagado limpio desde la interfaz.
 
-El constructor libre de reportes, launcher y empaquetado permanecen fuera del
-flujo activo hasta sus etapas correspondientes.
+El constructor libre de reportes, el ejecutable final y el instalador permanecen
+fuera del flujo activo hasta sus etapas correspondientes.
 
 ## Requisitos
 
@@ -76,11 +78,34 @@ python -m pip install -e '.[dev]'
 
 La configuración disponible está documentada en `.env.example`.
 
-## Ejecución
+## Inicio normal
+
+En macOS de desarrollo, hacer doble clic en `Iniciar Sistema.command`. También
+puede ejecutarse el launcher directamente:
+
+```bash
+python scripts/launch.py
+```
+
+El launcher prepara los directorios locales, inicia el servidor únicamente en
+`127.0.0.1`, espera a que `/health` responda y abre una sola pestaña en el
+navegador predeterminado. `APP_PORT` permite cambiar el puerto desde `.env`; el
+valor predeterminado es `8000`. Si ya existe una instancia de esta aplicación,
+la reutiliza sin iniciar otro servidor.
+
+Para terminar, utilizar **Apagar sistema** en la navegación y confirmar la
+acción. La página final puede cerrarse una vez mostrado “Sistema apagado”.
+
+## Inicio manual de desarrollo
+
+Como alternativa para diagnóstico, un desarrollador puede iniciar Uvicorn:
 
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+El apagado desde la interfaz solo está disponible cuando la aplicación fue
+iniciada mediante el launcher; en modo manual se utiliza `Ctrl+C`.
 
 Abrir <http://127.0.0.1:8000>. El diagnóstico está disponible en
 <http://127.0.0.1:8000/health> y el catálogo en
@@ -96,11 +121,11 @@ La base de desarrollo se crea en `data/app.db` y los logs se escriben en
 pytest
 ```
 
-`tests/test_system.py` permanece congelada porque prueba el launcher local, el
-apagado coordinado y la reutilización de una instancia, funcionalidades todavía
-no implementadas. El antiguo procesador monolítico y su prueba se eliminaron en
-Etapa 11: fueron reemplazados completamente por la importación cruda, la
-confirmación de productos y el procesamiento normalizado.
+No quedan pruebas congeladas. `tests/test_system.py` cubre el launcher local,
+health check, instancia única, rutas runtime y apagado coordinado. El antiguo
+procesador monolítico y su prueba se eliminaron en Etapa 11 porque fueron
+reemplazados completamente por la importación cruda, la confirmación de
+productos y el procesamiento normalizado.
 
 ## Flujo de uso
 
@@ -292,7 +317,7 @@ resguardarse por separado y nunca publicarse porque puede contener configuració
 sensible.
 
 El sistema es local y no incluye todavía backup automático, sincronización en
-la nube, usuarios, launcher, instalador ni apagado coordinado. Tampoco asigna el
-ingreso de un combo entre sus componentes. Cuando falta un costo oficial, la
-venta permanece visible, pero costo, utilidad y margen se presentan como no
-disponibles y la cobertura deja claro que el resultado financiero es parcial.
+la nube, usuarios, ejecutable final ni instalador. Tampoco asigna el ingreso de
+un combo entre sus componentes. Cuando falta un costo oficial, la venta
+permanece visible, pero costo, utilidad y margen se presentan como no disponibles
+y la cobertura deja claro que el resultado financiero es parcial.

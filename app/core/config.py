@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BRANCHES = ("Loma Linda", "Solidaridad", "Alianza", "Unidad")
+LOOPBACK_HOST = "127.0.0.1"
 IS_FROZEN = bool(getattr(sys, "frozen", False))
 RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
 
@@ -64,7 +65,7 @@ def _load_branches(value: str) -> tuple[str, ...]:
 @dataclass(frozen=True, slots=True)
 class Settings:
     app_name: str = os.getenv("APP_NAME", "Sistema de Concentrado de Ventas")
-    host: str = os.getenv("APP_HOST", "127.0.0.1")
+    host: str = LOOPBACK_HOST
     port: int = int(os.getenv("APP_PORT", "8000"))
     debug: bool = os.getenv("APP_DEBUG", "false").lower() == "true"
     database_url: str = _resolve_database_url(

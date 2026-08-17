@@ -3,9 +3,8 @@ const shutdownForm = document.querySelector("[data-shutdown-form]");
 if (shutdownForm) {
   shutdownForm.addEventListener("submit", (event) => {
     const confirmed = window.confirm(
-      "¿Deseas apagar el Sistema de Concentrado de Ventas?",
+      "¿Seguro que deseas apagar el sistema?",
     );
     if (!confirmed) event.preventDefault();
   });
 }
-

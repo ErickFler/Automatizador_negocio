@@ -67,7 +67,8 @@ def test_home_exposes_raw_import_navigation(
     assert "Control y análisis de ventas" in response.text
     assert "Cargar ventas" in response.text
     assert 'action="/uploads"' not in response.text
-    assert "Apagar sistema" not in response.text
+    assert "Apagar sistema" in response.text
+    assert 'action="/system/shutdown"' in response.text
 
 
 def test_import_form_lists_only_active_persistent_branches(

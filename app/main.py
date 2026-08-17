@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.pages import router as pages_router
 from app.api.reports import router as reports_router
 from app.api.costs import router as costs_router
+from app.api.system import router as system_router
 from app.core.config import RESOURCE_ROOT, settings
 from app.core.logging import configure_logging, get_logger
 from app.db.database import initialize_database
@@ -27,10 +28,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.state.shutdown_callback = None
+app.state.shutdown_token = ""
 app.mount("/static", StaticFiles(directory=RESOURCE_ROOT / "app" / "static"), name="static")
 app.include_router(pages_router)
 app.include_router(reports_router)
 app.include_router(costs_router)
+app.include_router(system_router)
 
 
 @app.get("/health")
