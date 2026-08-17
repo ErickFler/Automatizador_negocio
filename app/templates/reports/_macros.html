@@ -1,0 +1,70 @@
+{% macro heading(title, description) %}
+  <div class="report-heading">
+    <div>
+      <a class="back-link" href="/reports">← Volver a Reportes</a>
+      <h1>{{ title }}</h1>
+      <p>{{ description }}</p>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro branch_select(context, include_all=true) %}
+  <label>Sucursal<select name="branch">
+    {% if include_all %}<option value="">Todas las sucursales</option>{% endif %}
+    {% for item in context.branches %}<option value="{{ item.id }}" {% if context.filters.branch_id == item.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+  </select></label>
+{% endmacro %}
+
+{% macro category_select(context) %}
+  <label>Categoría<select name="category"><option value="">Todas las categorías</option>
+    {% for item in context.categories %}<option value="{{ item.id }}" {% if context.filters.category_id == item.id %}selected{% endif %}>{{ item.display_name }}</option>{% endfor %}
+  </select></label>
+{% endmacro %}
+
+{% macro product_select(context) %}
+  <label>Producto<select name="product"><option value="">Todos los productos</option>
+    {% for item in context.products %}<option value="{{ item.id }}" {% if context.filters.master_product_id == item.id %}selected{% endif %}>{{ item.display_name }}</option>{% endfor %}
+  </select></label>
+{% endmacro %}
+
+{% macro metric_select(selected, labels) %}
+  <label>Métrica<select name="metric">
+    {% for value, label in labels.items() %}<option value="{{ value }}" {% if selected == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></label>
+{% endmacro %}
+
+{% macro apply_actions() %}
+  <div class="filter-actions"><button class="button button-primary" type="submit">Consultar reporte</button></div>
+{% endmacro %}
+
+{% macro summary(context) %}
+  <section class="report-summary" aria-label="Resumen de filtros">
+    <div><span>Periodo</span><strong>{{ context.period_label }}</strong></div>
+    <div><span>Sucursal</span><strong>{{ context.branch_name }}</strong></div>
+    <div><span>Categoría</span><strong>{{ context.category_name }}</strong></div>
+    <div><span>Producto</span><strong>{{ context.product_name }}</strong></div>
+  </section>
+  {% if context.warning %}<div class="alert alert-error" role="alert">{{ context.warning }}</div>{% endif %}
+  {% if context.issue_summary.raw_rows_with_issues %}<aside class="report-notice" role="status">Este periodo contiene registros con incidencias. <a href="/imports">Revisar historial</a></aside>{% endif %}
+  {% if context.pending_batches %}<aside class="report-notice report-notice-warning" role="status">Hay cargas pendientes de confirmar que todavía no están incluidas en este reporte. <a href="/imports">Revisar cargas</a></aside>{% endif %}
+{% endmacro %}
+
+{% macro cards(totals) %}
+  <section class="dashboard-cards report-cards" aria-label="Totales del reporte">
+    <article class="dashboard-card dashboard-card-money"><span>Venta $</span><strong>{{ totals.sales_amount|money }}</strong></article>
+    <article class="dashboard-card"><span>Unidades totales</span><strong>{{ totals.total_units|decimal }}</strong></article>
+    <article class="dashboard-card"><span>Venta individual</span><strong>{{ totals.individual_sale_units|decimal }}</strong></article>
+    <article class="dashboard-card"><span>Combo</span><strong>{{ totals.combo_units|decimal }}</strong></article>
+  </section>
+{% endmacro %}
+
+{% macro metric_cells(metrics) %}
+  <td class="number-cell">{{ metrics.total_units|decimal }}</td>
+  <td class="number-cell">{{ metrics.individual_sale_units|decimal }}</td>
+  <td class="number-cell">{{ metrics.combo_units|decimal }}</td>
+  <td class="number-cell">{{ metrics.sales_amount|money }}</td>
+{% endmacro %}
+
+{% macro empty() %}
+  <section class="panel empty-state report-empty"><h2>No hay información registrada para los filtros seleccionados.</h2><p>Pruebe con otro periodo o revise las cargas disponibles.</p></section>
+{% endmacro %}

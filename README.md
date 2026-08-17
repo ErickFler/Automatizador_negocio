@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3, 4, 5 y 6** están activas:
+Las **Etapas 0, 1, 2, 3, 4, 5, 6 y 7** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -38,10 +38,14 @@ Las **Etapas 0, 1, 2, 3, 4, 5 y 6** están activas:
 - filtros por sucursal, categoría y producto maestro;
 - tarjetas, gráficas temporal y por sucursal, y tabla de productos;
 - avisos visibles de incidencias y cargas pendientes.
+- índice de reportes preconfigurados en `/reports`;
+- reportes diario, semanal, histórico semanal, histórico mensual, de productos
+  y comparativo de sucursales;
+- detalle individual de producto con equivalencias, evolución y cambios de
+  precio observados.
 
-Los reportes analíticos independientes, costos administrados, exportación,
-launcher y empaquetado permanecen fuera del flujo activo hasta sus etapas
-correspondientes.
+El constructor libre de reportes, costos administrados, exportación, launcher y
+empaquetado permanecen fuera del flujo activo hasta sus etapas correspondientes.
 Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
@@ -67,7 +71,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 Abrir <http://127.0.0.1:8000>. El diagnóstico está disponible en
 <http://127.0.0.1:8000/health> y el catálogo en
-<http://127.0.0.1:8000/products>.
+<http://127.0.0.1:8000/products>. Los reportes se consultan desde
+<http://127.0.0.1:8000/reports>.
 
 La base de desarrollo se crea en `data/app.db` y los logs se escriben en
 `data/logs/app.log`. Ambos son archivos locales ignorados por Git.
@@ -158,3 +163,15 @@ Las gráficas se dibujan con un recurso JavaScript local para que el sistema sig
 funcionando sin internet. Cada gráfica incluye también una tabla de valores
 accesible. Los parámetros recibidos por URL se validan contra listas cerradas y
 los valores inválidos regresan a una opción segura con un aviso visible.
+
+## Reportes preconfigurados
+
+`reporting_service.py` resuelve parámetros, compone DTOs y prepara las tablas,
+pero delega todas las sumas y agrupaciones de ventas a
+`aggregation_service.py`. De esta forma, un mismo rango y filtros produce los
+mismos totales en el dashboard y en los reportes.
+
+Los históricos semanal y mensual rellenan periodos sin ventas con cero. El
+comparativo incluye siempre las cuatro sucursales activas. Las vistas muestran
+un resumen explícito de filtros, avisan cuando existen incidencias o cargas por
+homologar y nunca incorporan filas crudas sin `SaleRecord` en sus métricas.

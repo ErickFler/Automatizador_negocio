@@ -96,6 +96,18 @@ class ProductAggregate:
 
 
 @dataclass(frozen=True, slots=True)
+class ProductBranchAggregate:
+    master_product_id: int
+    product_name: str
+    category_id: int
+    category_name: str
+    branch_id: int
+    branch_name: str
+    metrics: Metrics
+    observed_sale_prices: tuple[Decimal, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class CategoryAggregate:
     category_id: int
     category_name: str
@@ -135,7 +147,11 @@ class _SaleFact:
 def aggregate_totals(
     session: Session, filters: AggregationFilters | None = None
 ) -> Metrics:
-    return _sum_metrics(_load_facts(session, filters or AggregationFilters()))
+    selected = filters or AggregationFilters()
+    statement = _aggregate_statement().select_from(SaleRecord)
+    statement = _join_sale_dimensions(statement)
+    statement = _apply_sale_filters(statement, selected)
+    return _metrics_from_row(session.execute(statement).one())
 
 
 def aggregate_daily(
@@ -144,21 +160,23 @@ def aggregate_daily(
     *,
     by_branch: bool = False,
 ) -> list[DailyAggregate]:
-    grouped: dict[tuple[date, int | None], list[_SaleFact]] = {}
-    for fact in _load_facts(session, filters or AggregationFilters()):
-        key = (fact.sales_date, fact.branch_id if by_branch else None)
-        grouped.setdefault(key, []).append(fact)
-    result = []
-    for (sales_date, branch_id), facts in sorted(grouped.items()):
-        result.append(
-            DailyAggregate(
-                sales_date=sales_date,
-                branch_id=branch_id,
-                branch_name=facts[0].branch_name if branch_id is not None else None,
-                metrics=_sum_metrics(facts),
-            )
+    selected = filters or AggregationFilters()
+    dimensions = [SaleRecord.sales_date]
+    if by_branch:
+        dimensions.extend((Branch.id, Branch.name))
+    statement = _aggregate_statement(*dimensions).select_from(SaleRecord)
+    statement = _join_sale_dimensions(statement, include_branch=by_branch)
+    statement = _apply_sale_filters(statement, selected).group_by(*dimensions)
+    rows = session.execute(statement)
+    return [
+        DailyAggregate(
+            sales_date=row[0],
+            branch_id=row[1] if by_branch else None,
+            branch_name=row[2] if by_branch else None,
+            metrics=_metrics_from_row(row, offset=3 if by_branch else 1),
         )
-    return result
+        for row in rows
+    ]
 
 
 def iso_year_and_week(value: date) -> tuple[int, int]:
@@ -215,17 +233,17 @@ def weekly_series(
     last_week = date(iso_year, 12, 28).isocalendar().week
     _, last_sunday = iso_week_bounds(iso_year, last_week)
     selected = _bounded_filters(filters, first_monday, last_sunday)
-    grouped: dict[int, list[_SaleFact]] = {}
-    for fact in _load_facts(session, selected):
-        year, week = iso_year_and_week(fact.sales_date)
+    grouped: dict[int, list[Metrics]] = {}
+    for row in aggregate_daily(session, selected):
+        year, week = iso_year_and_week(row.sales_date)
         if year == iso_year:
-            grouped.setdefault(week, []).append(fact)
+            grouped.setdefault(week, []).append(row.metrics)
     weeks = range(1, last_week + 1) if complete else sorted(grouped)
     return [
         SeriesPoint(
             key=f"{iso_year}-W{week:02d}",
             label=f"Semana {week:02d}",
-            value=metric_value(_sum_metrics(grouped.get(week, [])), metric),
+            value=metric_value(_sum_metric_rows(grouped.get(week, [])), metric),
             period_start=date.fromisocalendar(iso_year, week, 1),
         )
         for week in weeks
@@ -242,10 +260,10 @@ def monthly_series(
 ) -> list[SeriesPoint]:
     _validate_metric(metric)
     selected = _bounded_filters(filters, date(year, 1, 1), date(year, 12, 31))
-    grouped: dict[int, list[_SaleFact]] = {}
-    for fact in _load_facts(session, selected):
-        if fact.sales_date.year == year:
-            grouped.setdefault(fact.sales_date.month, []).append(fact)
+    grouped: dict[int, list[Metrics]] = {}
+    for row in aggregate_daily(session, selected):
+        if row.sales_date.year == year:
+            grouped.setdefault(row.sales_date.month, []).append(row.metrics)
     months = range(1, 13) if complete else sorted(grouped)
     labels = (
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -255,7 +273,7 @@ def monthly_series(
         SeriesPoint(
             key=f"{year}-{month:02d}",
             label=labels[month - 1],
-            value=metric_value(_sum_metrics(grouped.get(month, [])), metric),
+            value=metric_value(_sum_metric_rows(grouped.get(month, [])), metric),
             period_start=date(year, month, 1),
         )
         for month in months
@@ -266,10 +284,17 @@ def aggregate_by_branch(
     session: Session, filters: AggregationFilters | None = None
 ) -> list[BranchAggregate]:
     selected = filters or AggregationFilters()
-    facts = _load_facts(session, selected)
-    grouped: dict[int, list[_SaleFact]] = {}
-    for fact in facts:
-        grouped.setdefault(fact.branch_id, []).append(fact)
+    aggregate_statement = _aggregate_statement(SaleRecord.branch_id).select_from(
+        SaleRecord
+    )
+    aggregate_statement = _join_sale_dimensions(aggregate_statement)
+    aggregate_statement = _apply_sale_filters(
+        aggregate_statement, selected
+    ).group_by(SaleRecord.branch_id)
+    grouped = {
+        row[0]: _metrics_from_row(row, offset=1)
+        for row in session.execute(aggregate_statement)
+    }
     statement = select(Branch).where(Branch.active.is_(True)).order_by(Branch.id)
     if selected.branch_id is not None:
         statement = statement.where(Branch.id == selected.branch_id)
@@ -277,7 +302,7 @@ def aggregate_by_branch(
         BranchAggregate(
             branch_id=branch.id,
             branch_name=branch.name,
-            metrics=_sum_metrics(grouped.get(branch.id, [])),
+            metrics=grouped.get(branch.id, Metrics()),
         )
         for branch in session.scalars(statement)
     ]
@@ -291,18 +316,25 @@ def aggregate_by_product(
     direction: SortDirection = "asc",
 ) -> list[ProductAggregate]:
     _validate_sort(sort_by, direction)
-    grouped: dict[int, list[_SaleFact]] = {}
-    for fact in _load_facts(session, filters or AggregationFilters()):
-        grouped.setdefault(fact.master_product_id, []).append(fact)
+    selected = filters or AggregationFilters()
+    dimensions = (
+        MasterProduct.id,
+        MasterProduct.display_name,
+        Category.id,
+        Category.display_name,
+    )
+    statement = _aggregate_statement(*dimensions).select_from(SaleRecord)
+    statement = _join_sale_dimensions(statement)
+    statement = _apply_sale_filters(statement, selected).group_by(*dimensions)
     rows = [
         ProductAggregate(
-            master_product_id=product_id,
-            product_name=facts[0].product_name,
-            category_id=facts[0].category_id,
-            category_name=facts[0].category_name,
-            metrics=_sum_metrics(facts),
+            master_product_id=row[0],
+            product_name=row[1],
+            category_id=row[2],
+            category_name=row[3],
+            metrics=_metrics_from_row(row, offset=4),
         )
-        for product_id, facts in grouped.items()
+        for row in session.execute(statement)
     ]
     rows.sort(key=lambda row: row.product_name.casefold())
     if sort_by == "name":
@@ -316,23 +348,61 @@ def aggregate_by_product(
     return rows
 
 
+def aggregate_by_product_branch(
+    session: Session, filters: AggregationFilters | None = None
+) -> list[ProductBranchAggregate]:
+    selected = filters or AggregationFilters()
+    dimensions = (
+        MasterProduct.id,
+        MasterProduct.display_name,
+        Category.id,
+        Category.display_name,
+        Branch.id,
+        Branch.name,
+    )
+    statement = _aggregate_statement(*dimensions).select_from(SaleRecord)
+    statement = _join_sale_dimensions(statement, include_branch=True)
+    statement = _apply_sale_filters(statement, selected).group_by(*dimensions)
+    price_statement = (
+        select(SaleRecord.master_product_id, SaleRecord.branch_id, SaleRecord.sale_price)
+        .select_from(SaleRecord)
+        .distinct()
+    )
+    price_statement = _join_sale_dimensions(price_statement)
+    price_statement = _apply_sale_filters(price_statement, selected)
+    prices: dict[tuple[int, int], list[Decimal]] = {}
+    for product_id, branch_id, sale_price in session.execute(price_statement):
+        prices.setdefault((product_id, branch_id), []).append(sale_price)
+    return sorted(
+        (
+            ProductBranchAggregate(
+                master_product_id=row[0],
+                product_name=row[1],
+                category_id=row[2],
+                category_name=row[3],
+                branch_id=row[4],
+                branch_name=row[5],
+                metrics=_metrics_from_row(row, offset=6),
+                observed_sale_prices=tuple(sorted(prices.get((row[0], row[4]), []))),
+            )
+            for row in session.execute(statement)
+        ),
+        key=lambda row: (row.product_name.casefold(), row.branch_name.casefold()),
+    )
+
+
 def aggregate_by_category(
     session: Session, filters: AggregationFilters | None = None
 ) -> list[CategoryAggregate]:
-    grouped: dict[int, list[_SaleFact]] = {}
-    for fact in _load_facts(session, filters or AggregationFilters()):
-        grouped.setdefault(fact.category_id, []).append(fact)
-    return sorted(
-        (
-            CategoryAggregate(
-                category_id=category_id,
-                category_name=facts[0].category_name,
-                metrics=_sum_metrics(facts),
-            )
-            for category_id, facts in grouped.items()
-        ),
-        key=lambda row: row.category_name.casefold(),
-    )
+    selected = filters or AggregationFilters()
+    dimensions = (Category.id, Category.display_name)
+    statement = _aggregate_statement(*dimensions).select_from(SaleRecord)
+    statement = _join_sale_dimensions(statement)
+    statement = _apply_sale_filters(statement, selected).group_by(*dimensions)
+    return [
+        CategoryAggregate(row[0], row[1], _metrics_from_row(row, offset=2))
+        for row in session.execute(statement.order_by(Category.display_name))
+    ]
 
 
 def summarize_issues(
@@ -400,6 +470,46 @@ def price_history(
 def metric_value(metrics: Metrics, metric: MetricName) -> Decimal:
     _validate_metric(metric)
     return getattr(metrics, metric)
+
+
+def _aggregate_statement(*dimensions: object) -> Select:
+    return select(
+        *dimensions,
+        func.coalesce(func.sum(SaleRecord.total_units), 0),
+        func.coalesce(func.sum(SaleRecord.individual_sale_units), 0),
+        func.coalesce(func.sum(SaleRecord.combo_units), 0),
+        func.coalesce(func.sum(SaleRecord.sales_amount), 0),
+    )
+
+
+def _join_sale_dimensions(statement: Select, *, include_branch: bool = False) -> Select:
+    statement = (
+        statement.join(MasterProduct, MasterProduct.id == SaleRecord.master_product_id)
+        .join(Category, Category.id == MasterProduct.category_id)
+        .join(ImportBatch, ImportBatch.id == SaleRecord.import_batch_id)
+        .where(ImportBatch.status.in_((COMPLETED, COMPLETED_WITH_WARNINGS)))
+    )
+    if include_branch:
+        statement = statement.join(Branch, Branch.id == SaleRecord.branch_id)
+    return statement
+
+
+def _metrics_from_row(row: object, *, offset: int = 0) -> Metrics:
+    return Metrics(
+        total_units=row[offset] or ZERO,
+        individual_sale_units=row[offset + 1] or ZERO,
+        combo_units=row[offset + 2] or ZERO,
+        sales_amount=row[offset + 3] or ZERO,
+    )
+
+
+def _sum_metric_rows(rows: list[Metrics]) -> Metrics:
+    return Metrics(
+        total_units=sum((row.total_units for row in rows), ZERO),
+        individual_sale_units=sum((row.individual_sale_units for row in rows), ZERO),
+        combo_units=sum((row.combo_units for row in rows), ZERO),
+        sales_amount=sum((row.sales_amount for row in rows), ZERO),
+    )
 
 
 def _load_facts(session: Session, filters: AggregationFilters) -> list[_SaleFact]:

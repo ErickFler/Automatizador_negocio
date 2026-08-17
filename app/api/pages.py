@@ -6,14 +6,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.config import DATA_ROOT, RESOURCE_ROOT
+from app.core.config import DATA_ROOT
 from app.db.database import get_db
 from app.db.models import Branch, ImportBatch, ProcessingIssue, RawSaleRecord
-from app.presentation.formatters import format_date_mx, format_decimal, format_money
+from app.presentation.templates import templates
 from app.services.dashboard_service import (
     METRIC_LABELS,
     PERIODS,
@@ -42,11 +41,6 @@ from app.services.sales_processing_service import (
     process_normalized_sales_batch,
 )
 
-TEMPLATE_DIRECTORY = RESOURCE_ROOT / "app" / "templates"
-templates = Jinja2Templates(directory=TEMPLATE_DIRECTORY)
-templates.env.filters["decimal"] = format_decimal
-templates.env.filters["money"] = format_money
-templates.env.filters["date_mx"] = format_date_mx
 router = APIRouter()
 UPLOAD_DIRECTORY = DATA_ROOT / "uploads"
 STATUS_LABELS = {
