@@ -1,4 +1,4 @@
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect, select, text
 
 from app.core.config import DEFAULT_BRANCHES
 from app.db.database import SessionLocal, engine, initialize_database, seed_branches
@@ -41,3 +41,8 @@ def test_branch_seed_is_idempotent() -> None:
         ).all()
 
     assert len(expected_rows) == 4
+
+
+def test_sqlite_foreign_keys_are_enabled_at_runtime() -> None:
+    with engine.connect() as connection:
+        assert connection.scalar(text("PRAGMA foreign_keys")) == 1

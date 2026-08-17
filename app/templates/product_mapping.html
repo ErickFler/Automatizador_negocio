@@ -75,7 +75,7 @@
         <h2>Crear producto nuevo</h2>
         <form action="/imports/{{ batch.id }}/products/create" method="post" class="upload-form">
           <input type="hidden" name="external_product_id" value="{{ current.external_product_id }}">
-          <label><span>Nombre maestro</span><input type="text" name="master_display_name" value="{{ current.original_product_name }}" required></label>
+          <label><span>Nombre del producto</span><input type="text" name="master_display_name" value="{{ current.original_product_name }}" required></label>
           <label><span>Categoría</span><input type="text" name="category_display_name" value="{{ current.original_category_name or '' }}" required></label>
           <button class="button button-primary" type="submit">Crear y relacionar</button>
         </form>

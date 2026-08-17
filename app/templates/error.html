@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="panel empty-state error-page" role="alert">
+    <p class="eyebrow">No se pudo abrir esta página</p>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="bottom-actions">
+      <a class="button button-primary" href="/">Volver al inicio</a>
+      <a class="button button-secondary" href="/reports">Ver reportes</a>
+    </div>
+  </section>
+{% endblock %}

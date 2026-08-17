@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% import "reports/_macros.html" as ui %}
 {% block title %}{{ report.product.display_name }} · Reportes{% endblock %}
 {% block content %}
-  {{ ui.heading(report.product.display_name, "Detalle consolidado del producto maestro.") }}
+  {{ ui.heading(report.product.display_name, "Detalle consolidado del producto en todas las sucursales.") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Fecha inicial<input type="date" name="date_from" value="{{ report.context.filters.date_from.isoformat() }}"></label><label>Fecha final<input type="date" name="date_to" value="{{ report.context.filters.date_to.isoformat() }}"></label>{{ ui.branch_select(report.context) }}{{ ui.apply_actions('/reports/products/' ~ report.product.id ~ '/export') }}
   </form></section>{{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}{{ ui.financial_cards(report.financial) }}

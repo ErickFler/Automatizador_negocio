@@ -387,6 +387,8 @@ def test_http_import_duplicate_and_result(cost_client, cost_session, tmp_path) -
     )
     assert response.status_code == 200
     assert "Costos guardados" in response.text and "Ensalada de col" in response.text
+    assert "Importada" in response.text
+    assert ">IMPORTED<" not in response.text
     assert duplicate.status_code == 409
     assert "mismo archivo de costos" in duplicate.text
 

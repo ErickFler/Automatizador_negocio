@@ -87,7 +87,7 @@
       <article><span>Costo conocido</span><strong>{% if dashboard.financial.records_with_cost %}{{ dashboard.financial.known_cost|money }}{% elif dashboard.financial.total_records %}No disponible{% else %}$0.00{% endif %}</strong></article>
       <article class="financial-profit"><span>Utilidad conocida</span><strong>{% if dashboard.financial.records_with_cost %}{{ dashboard.financial.known_profit|money }}{% elif dashboard.financial.total_records %}No disponible{% else %}$0.00{% endif %}</strong></article>
       <article><span>Margen sobre venta con costo</span><strong>{{ dashboard.financial.known_margin_percent|percent }}</strong></article>
-      <article><span>Cobertura de costos</span><strong>{{ dashboard.financial.sales_coverage_percent|percent }}</strong><small>{{ dashboard.financial.records_with_cost }} de {{ dashboard.financial.total_records }} registros</small></article>
+      <article><span>Cobertura de costos</span><strong>{{ dashboard.financial.sales_coverage_percent|percent }}</strong><small>Porcentaje de la venta con costo oficial · {{ dashboard.financial.records_with_cost }} de {{ dashboard.financial.total_records }} registros</small></article>
     </div>
     <div class="financial-coverage-detail"><span>Venta total: <strong>{{ dashboard.financial.total_sales_amount|money }}</strong></span><span>Venta con costo: <strong>{{ dashboard.financial.sales_amount_with_known_cost|money }}</strong></span><span>Venta sin costo: <strong>{{ dashboard.financial.sales_amount_without_cost|money }}</strong></span></div>
   </section>
@@ -135,7 +135,7 @@
     </section>
 
     <section class="panel dashboard-products" aria-labelledby="products-title">
-      <div class="section-title simple-title"><div><h2 id="products-title">Productos</h2><p>Identidades maestras consolidadas para el periodo seleccionado.</p></div></div>
+      <div class="section-title simple-title"><div><h2 id="products-title">Productos</h2><p>Productos consolidados para el periodo seleccionado.</p></div></div>
       <div class="table-wrap">
         <table>
           <thead><tr>

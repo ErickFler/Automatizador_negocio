@@ -5,11 +5,11 @@
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Año<input type="number" min="2000" max="2100" name="year" value="{{ report.year }}"></label>
     {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.metric_select(report.metric, metric_labels) }}{{ ui.apply_actions('/reports/weekly-history/export') }}
-  </form></section>{{ ui.summary(report.context) }}
+  </form></section>{{ ui.summary(report.context) }}{{ ui.financial_cards(report.financial) }}
   <section class="panel chart-panel report-chart"><div class="section-title simple-title"><div><h2>Evolución semanal</h2><p>{{ metric_labels[report.metric] }}</p></div></div><div class="canvas-wrap"><canvas id="temporal-chart" role="img" aria-label="Evolución semanal de {{ metric_labels[report.metric] }}"></canvas></div></section>
   {% if not report.has_data %}{{ ui.empty() }}{% endif %}
-  <section class="panel report-table"><h2>Semanas ISO de {{ report.year }}</h2><div class="table-wrap"><table><thead><tr><th>Semana</th><th>Periodo</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th></tr></thead><tbody>
-    {% for row in report.rows %}<tr><td><strong>Semana {{ "%02d"|format(row.number) }}</strong></td><td>{{ row.period_start|date_mx }} - {{ row.period_end|date_mx }}</td>{{ ui.metric_cells(row.metrics) }}</tr>{% endfor %}
+  <section class="panel report-table"><h2>Semanas ISO de {{ report.year }}</h2><div class="table-wrap"><table><thead><tr><th>Semana</th><th>Periodo</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th><th class="number-cell">Costo</th><th class="number-cell">Utilidad</th><th class="number-cell">Margen</th><th class="number-cell">Cobertura</th></tr></thead><tbody>
+    {% for row in report.rows %}<tr><td><strong>Semana {{ "%02d"|format(row.number) }}</strong></td><td>{{ row.period_start|date_mx }} - {{ row.period_end|date_mx }}</td>{{ ui.metric_cells(row.metrics) }}{{ ui.financial_cells(row.financial) }}</tr>{% endfor %}
   </tbody></table></div></section>
 {% endblock %}
 {% block scripts %}<script id="dashboard-chart-data" type="application/json">{{ report.chart_json|tojson }}</script><script src="{{ url_for('static', path='/js/dashboard.js') }}"></script>{% endblock %}

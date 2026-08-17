@@ -28,6 +28,15 @@ from app.services.product_matching import find_product_candidates, search_master
 
 router = APIRouter(prefix="/costs", tags=["costs"])
 COST_UPLOAD_DIRECTORY = DATA_ROOT / "cost_uploads"
+COST_ROW_STATUS_LABELS = {
+    "PENDING_MAPPING": "Por confirmar",
+    "READY": "Lista para importar",
+    "WARNING": "Requiere revisión",
+    "INVALID": "No importada",
+    "CONFLICT": "Conflicto",
+    "IMPORTED": "Importada",
+    "SKIPPED": "Omitida",
+}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -117,7 +126,9 @@ def cost_import_result(
 ) -> HTMLResponse:
     batch = get_cost_import_batch(session, batch_id=batch_id)
     return templates.TemplateResponse(
-        request=request, name="costs/result.html", context={"batch": batch}
+        request=request,
+        name="costs/result.html",
+        context={"batch": batch, "row_status_labels": COST_ROW_STATUS_LABELS},
     )
 
 

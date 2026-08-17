@@ -412,6 +412,26 @@ def test_six_report_pages_render_and_navigate_back(reporting_client, path, expec
     assert 'href="/reports"' in response.text
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/reports/daily?date=2026-08-12",
+        "/reports/weekly?date=2026-08-12",
+        "/reports/weekly-history?year=2026",
+        "/reports/monthly?year=2026",
+    ],
+)
+def test_temporal_reports_show_financial_metrics(reporting_client, path) -> None:
+    client, _, _ = reporting_client
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert "Costo" in response.text
+    assert "Utilidad" in response.text
+    assert "Margen" in response.text
+    assert "Cobertura" in response.text
+
+
 def test_daily_html_has_summary_alerts_and_no_local_ids(reporting_client) -> None:
     client, _, _ = reporting_client
     response = client.get("/reports/daily?date=2026-08-12")

@@ -65,6 +65,13 @@
   <td class="number-cell">{{ metrics.sales_amount|money }}</td>
 {% endmacro %}
 
+{% macro financial_cells(financial) %}
+  <td class="number-cell">{% if financial.records_with_cost %}{{ financial.known_cost|money }}{% else %}No disponible{% endif %}</td>
+  <td class="number-cell">{% if financial.records_with_cost %}{{ financial.known_profit|money }}{% else %}No disponible{% endif %}</td>
+  <td class="number-cell">{{ financial.known_margin_percent|percent }}</td>
+  <td class="number-cell">{{ financial.sales_coverage_percent|percent }}</td>
+{% endmacro %}
+
 {% macro empty() %}
   <section class="panel empty-state report-empty"><h2>No hay información registrada para los filtros seleccionados.</h2><p>Pruebe con otro periodo o revise las cargas disponibles.</p></section>
 {% endmacro %}
@@ -76,7 +83,7 @@
       <article><span>Costo conocido</span><strong>{% if financial.records_with_cost %}{{ financial.known_cost|money }}{% else %}No disponible{% endif %}</strong></article>
       <article class="financial-profit"><span>Utilidad conocida</span><strong>{% if financial.records_with_cost %}{{ financial.known_profit|money }}{% else %}No disponible{% endif %}</strong></article>
       <article><span>Margen sobre venta con costo</span><strong>{{ financial.known_margin_percent|percent }}</strong></article>
-      <article><span>Cobertura de costos</span><strong>{{ financial.sales_coverage_percent|percent }}</strong><small>{{ financial.records_with_cost }} de {{ financial.total_records }} registros</small></article>
+      <article><span>Cobertura de costos</span><strong>{{ financial.sales_coverage_percent|percent }}</strong><small>Porcentaje de la venta con costo oficial · {{ financial.records_with_cost }} de {{ financial.total_records }} registros</small></article>
     </div>
     <div class="financial-coverage-detail"><span>Venta total: <strong>{{ financial.total_sales_amount|money }}</strong></span><span>Venta con costo: <strong>{{ financial.sales_amount_with_known_cost|money }}</strong></span><span>Venta sin costo: <strong>{{ financial.sales_amount_without_cost|money }}</strong></span></div>
   </section>

@@ -3,11 +3,11 @@
 {% block content %}
   {{ ui.heading("Ventas diarias", "¿Qué ocurrió en un día específico?") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
-    <label>Fecha<input type="date" name="date" value="{{ report.sales_date.isoformat() }}"></label>
+    <label>Fecha de ventas<input type="date" name="date" value="{{ report.sales_date.isoformat() }}"></label>
     {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.apply_actions('/reports/daily/export') }}
   </form></section>
-  {{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}
-  {% if report.rows %}<section class="panel report-table"><h2>Detalle por producto y sucursal</h2><div class="table-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Sucursal</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th><th>Precio observado</th></tr></thead><tbody>
-    {% for row in report.rows %}<tr><td><strong>{{ row.product_name }}</strong></td><td>{{ row.category_name }}</td><td>{{ row.branch_name }}</td>{{ ui.metric_cells(row.metrics) }}<td>{% for price in row.observed_sale_prices %}{{ price|money }}{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}
+  {{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}{{ ui.financial_cards(report.financial) }}
+  {% if report.rows %}<section class="panel report-table"><h2>Detalle por producto y sucursal</h2><div class="table-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Sucursal</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th><th>Precio observado</th><th class="number-cell">Costo</th><th class="number-cell">Utilidad</th><th class="number-cell">Margen</th><th class="number-cell">Cobertura</th></tr></thead><tbody>
+    {% for row in report.rows %}{% set finance = report.row_financial[(row.master_product_id, row.branch_id)].financial %}<tr><td><strong>{{ row.product_name }}</strong></td><td>{{ row.category_name }}</td><td>{{ row.branch_name }}</td>{{ ui.metric_cells(row.metrics) }}<td>{% for price in row.observed_sale_prices %}{{ price|money }}{% if not loop.last %}, {% endif %}{% endfor %}</td>{{ ui.financial_cells(finance) }}</tr>{% endfor %}
   </tbody></table></div></section>{% else %}{{ ui.empty() }}{% endif %}
 {% endblock %}

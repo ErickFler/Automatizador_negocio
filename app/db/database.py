@@ -1,7 +1,9 @@
 from collections.abc import Generator
 from pathlib import Path
+import sqlite3
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy import select
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -10,6 +12,15 @@ from app.core.config import DEFAULT_BRANCHES, settings
 
 class Base(DeclarativeBase):
     pass
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def _ensure_sqlite_directory(database_url: str) -> None:

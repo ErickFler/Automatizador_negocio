@@ -6,7 +6,7 @@
   <section class="hero compact">
     <div>
       <p class="eyebrow">Inspección del catálogo</p>
-      <h1>Productos maestros</h1>
+      <h1>Catálogo de productos</h1>
       <p class="hero-copy">Cada equivalencia representa cómo aparece el producto en una sucursal.</p>
     </div>
     <a class="button button-secondary" href="/">Volver al inicio</a>
@@ -18,7 +18,7 @@
         <table>
           <thead>
             <tr>
-              <th>Producto maestro</th>
+              <th>Producto</th>
               <th>Categoría</th>
               {% for branch in branches %}<th>{{ branch.name }}</th>{% endfor %}
               <th>Total equivalencias</th>
@@ -51,7 +51,7 @@
     {% else %}
       <div class="empty-state">
         <h2>Catálogo vacío</h2>
-        <p>Los productos maestros se crearán mediante el flujo correspondiente en una etapa posterior.</p>
+        <p>Al cargar ventas, podrá registrar aquí los productos nuevos y relacionar cómo aparecen en cada sucursal.</p>
       </div>
     {% endif %}
   </section>

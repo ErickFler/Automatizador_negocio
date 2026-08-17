@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 y 10** están activas:
+Las **Etapas 0 a 11** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -55,10 +55,11 @@ Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 y 10** están activas:
   producto;
 - archivos `.xlsx` en memoria, con filtros, orden, formatos, incidencias y
   advertencias consistentes con la pantalla.
+- manejo comprensible de errores HTTP, revisión visual y validación integral
+  del flujo desde una base nueva hasta la exportación.
 
 El constructor libre de reportes, launcher y empaquetado permanecen fuera del
 flujo activo hasta sus etapas correspondientes.
-Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
 
@@ -95,8 +96,27 @@ La base de desarrollo se crea en `data/app.db` y los logs se escriben en
 pytest
 ```
 
-Las pruebas de servicios pertenecientes a etapas futuras se mantienen congeladas
-en sus archivos hasta adaptar esos servicios a la arquitectura V2.
+`tests/test_system.py` permanece congelada porque prueba el launcher local, el
+apagado coordinado y la reutilización de una instancia, funcionalidades todavía
+no implementadas. El antiguo procesador monolítico y su prueba se eliminaron en
+Etapa 11: fueron reemplazados completamente por la importación cruda, la
+confirmación de productos y el procesamiento normalizado.
+
+## Flujo de uso
+
+1. Abrir **Cargar ventas**, elegir la fecha de ventas y una de las cuatro
+   sucursales, y procesar el archivo Excel.
+2. Si aparecen productos nuevos, relacionarlos con un producto conocido o
+   registrarlos con nombre y categoría.
+3. Consultar las ventas normalizadas en el dashboard y los reportes.
+4. Cargar costos oficiales con su fecha de vigencia desde **Costos**.
+5. Revisar costo, utilidad, margen y cobertura; una cobertura incompleta se
+   identifica como utilidad parcial.
+6. Exportar el reporte visible a Excel cuando se necesite compartirlo.
+
+El historial conserva cada carga y sus incidencias. Recargar una página no
+repite el procesamiento, y un archivo duplicado para la misma fecha y sucursal
+se rechaza explícitamente.
 
 ## Modelo de productos
 
@@ -109,10 +129,10 @@ Un producto maestro puede tener múltiples equivalencias de distintas sucursales
 
 ## Importación cruda
 
-La carga de Etapa 2 conserva el valor recibido en cada columna confirmada y el
+La carga conserva el valor recibido en cada columna confirmada y el
 número de fila del Excel. Una incidencia no elimina la fila ni convierte valores
 inválidos en cero. La importación no crea productos y no calcula unidades
-cobradas ni unidades combo.
+de venta individual ni unidades combo.
 
 ## Homologación
 
@@ -139,7 +159,8 @@ hasta 12 decimales y no se aplica tolerancia ni redondeo de negocio.
 Cantidad, precio de venta o importe total ilegibles, así como precio de venta
 cero, omiten únicamente la venta normalizada de esa fila. Costo o importe
 original ilegibles no bloquean la venta. Resultados no enteros, valores negativos
-y unidades cobradas mayores que la cantidad se preservan y generan incidencias.
+y unidades de venta individual mayores que la cantidad se preservan y generan
+incidencias.
 
 Al reprocesar se sustituyen exclusivamente las incidencias calculadas de Etapa 4;
 las incidencias de importación y homologación permanecen intactas.
@@ -254,3 +275,24 @@ menos el costo físico de todas sus unidades consumidas. Los ingresos de combos
 no se redistribuyen entre sus componentes porque no existe todavía una regla de
 negocio aprobada para hacerlo; por ello, un componente de combo puede mostrar
 utilidad negativa sin que el sistema la corrija artificialmente.
+
+## Operación, respaldo y limitaciones
+
+Para preservar el sistema se deben respaldar juntos:
+
+- `data/app.db`, que contiene ventas, productos, equivalencias, incidencias y
+  costos;
+- `data/uploads/`, con los archivos originales de ventas;
+- `data/cost_uploads/`, con los archivos originales de costos.
+
+`data/logs/` es útil para diagnóstico, pero no es la fuente de verdad del
+negocio. Los Excel exportados se generan en memoria y deben guardarse donde el
+usuario elija; no forman parte del respaldo interno. Si se usa un `.env`, debe
+resguardarse por separado y nunca publicarse porque puede contener configuración
+sensible.
+
+El sistema es local y no incluye todavía backup automático, sincronización en
+la nube, usuarios, launcher, instalador ni apagado coordinado. Tampoco asigna el
+ingreso de un combo entre sus componentes. Cuando falta un costo oficial, la
+venta permanece visible, pero costo, utilidad y margen se presentan como no
+disponibles y la cobertura deja claro que el resultado financiero es parcial.

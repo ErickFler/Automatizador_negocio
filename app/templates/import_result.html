@@ -16,7 +16,7 @@
   </section>
 
   <section class="summary-grid">
-    <article><span>Fecha</span><strong>{{ batch.sales_date.strftime('%d/%m/%Y') }}</strong></article>
+    <article><span>Fecha de ventas</span><strong>{{ batch.sales_date.strftime('%d/%m/%Y') }}</strong></article>
     <article><span>Sucursal</span><strong>{{ batch.branch.name }}</strong></article>
     <article><span>Estado</span><strong>{{ status_labels[batch.status] }}</strong></article>
     <article><span>Total de filas</span><strong>{{ batch.total_rows }}</strong></article>
