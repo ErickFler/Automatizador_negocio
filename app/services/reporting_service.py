@@ -6,7 +6,14 @@ from urllib.parse import urlencode
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db.models import Branch, BranchProduct, Category, ImportBatch, MasterProduct
+from app.db.models import (
+    Branch,
+    BranchProduct,
+    Category,
+    ImportBatch,
+    MasterProduct,
+    ProductCost,
+)
 from app.services.aggregation_service import (
     ALLOWED_METRICS,
     ALLOWED_PRODUCT_SORTS,
@@ -34,6 +41,17 @@ from app.services.aggregation_service import (
 )
 from app.services.dashboard_service import METRIC_LABELS, MONTH_NAMES
 from app.services.raw_import_service import WAITING_FOR_PRODUCT_MAPPING
+from app.services.profitability_service import (
+    ALLOWED_FINANCIAL_SORTS,
+    BranchProfitability,
+    CategoryProfitability,
+    FinancialMetrics,
+    ProductProfitability,
+    profitability_by_branch,
+    profitability_by_category,
+    profitability_by_product,
+    profitability_totals,
+)
 
 ZERO = Decimal(0)
 
@@ -112,6 +130,9 @@ class ProductsReport:
     rows: tuple[ProductAggregate, ...]
     sort_by: str
     direction: str
+    financial: FinancialMetrics
+    product_financial: dict[int, ProductProfitability]
+    category_financial: tuple[CategoryProfitability, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +141,8 @@ class BranchesReport:
     totals: Metrics
     metric: MetricName
     rows: tuple[BranchAggregate, ...]
+    financial: FinancialMetrics
+    branch_financial: dict[int, BranchProfitability]
 
     @property
     def has_data(self) -> bool:
@@ -146,6 +169,12 @@ class ProductDetailReport:
     branches: tuple[BranchAggregate, ...]
     daily_rows: tuple[DailyAggregate, ...]
     prices: tuple[PriceHistoryPoint, ...]
+    financial: FinancialMetrics
+    official_costs: tuple[ProductCost, ...]
+
+    @property
+    def has_cost_changes(self) -> bool:
+        return len(self.official_costs) > 1
 
 
 def build_daily_report(
@@ -311,18 +340,37 @@ def build_products_report(
     warnings: list[str] = []
     current = today or date.today()
     start, end = _date_range_values(date_from, date_to, current.replace(day=1), current, warnings)
-    sort_by, direction = _safe_sort(sort_by, direction, warnings)
+    sort_by, direction = _safe_product_report_sort(sort_by, direction, warnings)
     context = _context(session, start, end, branch, category, "", warnings)
-    return ProductsReport(
-        context=context,
-        totals=aggregate_totals(session, context.filters),
-        rows=tuple(
+    if sort_by in ALLOWED_PRODUCT_SORTS:
+        rows = tuple(
             aggregate_by_product(
                 session, context.filters, sort_by=sort_by, direction=direction
             )
-        ),
+        )
+        financial_rows = profitability_by_product(session, context.filters)
+    else:
+        financial_rows = profitability_by_product(
+            session, context.filters, sort_by=sort_by, direction=direction
+        )
+        sales_by_id = {
+            row.master_product_id: row
+            for row in aggregate_by_product(session, context.filters)
+        }
+        rows = tuple(
+            sales_by_id[row.master_product_id]
+            for row in financial_rows
+            if row.master_product_id in sales_by_id
+        )
+    return ProductsReport(
+        context=context,
+        totals=aggregate_totals(session, context.filters),
+        rows=rows,
         sort_by=sort_by,
         direction=direction,
+        financial=profitability_totals(session, context.filters),
+        product_financial={row.master_product_id: row for row in financial_rows},
+        category_financial=tuple(profitability_by_category(session, context.filters)),
     )
 
 
@@ -341,11 +389,14 @@ def build_branches_report(
     start, end = _date_range_values(date_from, date_to, current.replace(day=1), current, warnings)
     selected_metric = _safe_metric(metric, warnings)
     context = _context(session, start, end, "", category, product, warnings)
+    branch_financial_rows = profitability_by_branch(session, context.filters)
     return BranchesReport(
         context=context,
         totals=aggregate_totals(session, context.filters),
         metric=selected_metric,
         rows=tuple(aggregate_by_branch(session, context.filters)),
+        financial=profitability_totals(session, context.filters),
+        branch_financial={row.branch_id: row for row in branch_financial_rows},
     )
 
 
@@ -376,6 +427,24 @@ def build_product_detail_report(
     context = _context(
         session, start, end, branch, str(product.category_id), str(product.id), warnings
     )
+    costs = list(
+        session.scalars(
+            select(ProductCost)
+            .where(
+                ProductCost.master_product_id == product.id,
+                ProductCost.effective_from <= end,
+            )
+            .order_by(ProductCost.effective_from)
+        )
+    )
+    baseline = next(
+        (row for row in reversed(costs) if row.effective_from <= start), None
+    )
+    official_costs = tuple(
+        row
+        for row in costs
+        if row.effective_from > start or row is baseline
+    )
     return ProductDetailReport(
         context=context,
         product=product,
@@ -390,6 +459,8 @@ def build_product_detail_report(
                 changes_only=True,
             )
         ),
+        financial=profitability_totals(session, context.filters),
+        official_costs=official_costs,
     )
 
 
@@ -504,6 +575,16 @@ def _safe_metric(raw: str, warnings: list[str]) -> MetricName:
 
 def _safe_sort(sort_by: str, direction: str, warnings: list[str]) -> tuple[str, str]:
     if sort_by not in ALLOWED_PRODUCT_SORTS or direction not in {"asc", "desc"}:
+        warnings.append("El orden no era válido; se ordenó por Venta $.")
+        return "sales_amount", "desc"
+    return sort_by, direction
+
+
+def _safe_product_report_sort(
+    sort_by: str, direction: str, warnings: list[str]
+) -> tuple[str, str]:
+    allowed = {*ALLOWED_PRODUCT_SORTS, *ALLOWED_FINANCIAL_SORTS}
+    if sort_by not in allowed or direction not in {"asc", "desc"}:
         warnings.append("El orden no era válido; se ordenó por Venta $.")
         return "sales_amount", "desc"
     return sort_by, direction

@@ -14,5 +14,9 @@ def format_money(value: Decimal | None) -> str:
     return f"${(value or Decimal(0)):,.2f}"
 
 
+def format_percent(value: Decimal | None) -> str:
+    return "No aplica" if value is None else f"{value:,.2f}%"
+
+
 def format_date_mx(value: date) -> str:
     return value.strftime("%d/%m/%Y")

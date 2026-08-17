@@ -31,6 +31,7 @@ from app.services.raw_import_service import (
     PROCESSING,
     WAITING_FOR_PRODUCT_MAPPING,
 )
+from app.services.profitability_service import FinancialMetrics, profitability_totals
 
 PERIODS = (
     ("today", "Hoy"),
@@ -91,6 +92,7 @@ class DashboardView:
     selection: DashboardSelection
     period_label: str
     totals: Metrics
+    financial: FinancialMetrics
     branches: tuple[Branch, ...]
     categories: tuple[Category, ...]
     products: tuple[MasterProduct, ...]
@@ -213,6 +215,7 @@ def build_dashboard(
         selection=selection,
         period_label=format_period_label(period, start, end),
         totals=totals,
+        financial=profitability_totals(session, filters),
         branches=branches,
         categories=categories,
         products=products,

@@ -68,3 +68,17 @@
 {% macro empty() %}
   <section class="panel empty-state report-empty"><h2>No hay información registrada para los filtros seleccionados.</h2><p>Pruebe con otro periodo o revise las cargas disponibles.</p></section>
 {% endmacro %}
+
+{% macro financial_cards(financial) %}
+  <section class="panel financial-summary" aria-label="Rentabilidad conocida">
+    <div class="section-title simple-title"><div><h2>Rentabilidad conocida</h2><p>El costo incluye todas las unidades utilizadas, incluso las incluidas en combos.</p></div></div>
+    <div class="financial-cards">
+      <article><span>Costo conocido</span><strong>{% if financial.records_with_cost %}{{ financial.known_cost|money }}{% else %}No disponible{% endif %}</strong></article>
+      <article class="financial-profit"><span>Utilidad conocida</span><strong>{% if financial.records_with_cost %}{{ financial.known_profit|money }}{% else %}No disponible{% endif %}</strong></article>
+      <article><span>Margen sobre venta con costo</span><strong>{{ financial.known_margin_percent|percent }}</strong></article>
+      <article><span>Cobertura de costos</span><strong>{{ financial.sales_coverage_percent|percent }}</strong><small>{{ financial.records_with_cost }} de {{ financial.total_records }} registros</small></article>
+    </div>
+    <div class="financial-coverage-detail"><span>Venta total: <strong>{{ financial.total_sales_amount|money }}</strong></span><span>Venta con costo: <strong>{{ financial.sales_amount_with_known_cost|money }}</strong></span><span>Venta sin costo: <strong>{{ financial.sales_amount_without_cost|money }}</strong></span></div>
+  </section>
+  {% if financial.incomplete %}<aside class="dashboard-notice dashboard-notice-warning"><div><strong>La utilidad mostrada es parcial.</strong><br>Faltan costos para parte de las ventas de este periodo.</div><a href="/costs?missing_only=true">Ver costos faltantes</a></aside>{% endif %}
+{% endmacro %}

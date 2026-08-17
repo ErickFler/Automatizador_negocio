@@ -81,6 +81,18 @@
     <article class="dashboard-card"><span>Unidades combo</span><strong>{{ dashboard.totals.combo_units|decimal }}</strong></article>
   </section>
 
+  <section class="panel financial-summary" aria-labelledby="financial-title">
+    <div class="section-title simple-title"><div><h2 id="financial-title">Rentabilidad conocida</h2><p>El costo incluye todas las unidades utilizadas, también las incluidas en combos.</p></div></div>
+    <div class="financial-cards">
+      <article><span>Costo conocido</span><strong>{% if dashboard.financial.records_with_cost %}{{ dashboard.financial.known_cost|money }}{% elif dashboard.financial.total_records %}No disponible{% else %}$0.00{% endif %}</strong></article>
+      <article class="financial-profit"><span>Utilidad conocida</span><strong>{% if dashboard.financial.records_with_cost %}{{ dashboard.financial.known_profit|money }}{% elif dashboard.financial.total_records %}No disponible{% else %}$0.00{% endif %}</strong></article>
+      <article><span>Margen sobre venta con costo</span><strong>{{ dashboard.financial.known_margin_percent|percent }}</strong></article>
+      <article><span>Cobertura de costos</span><strong>{{ dashboard.financial.sales_coverage_percent|percent }}</strong><small>{{ dashboard.financial.records_with_cost }} de {{ dashboard.financial.total_records }} registros</small></article>
+    </div>
+    <div class="financial-coverage-detail"><span>Venta total: <strong>{{ dashboard.financial.total_sales_amount|money }}</strong></span><span>Venta con costo: <strong>{{ dashboard.financial.sales_amount_with_known_cost|money }}</strong></span><span>Venta sin costo: <strong>{{ dashboard.financial.sales_amount_without_cost|money }}</strong></span></div>
+  </section>
+  {% if dashboard.financial.incomplete %}<aside class="dashboard-notice dashboard-notice-warning" role="status"><div><strong>La utilidad mostrada es parcial.</strong><br>Faltan costos para parte de las ventas de este periodo.</div><a href="/costs?missing_only=true">Ver productos sin costo</a></aside>{% endif %}
+
   {% if dashboard.issue_summary.raw_rows_with_issues %}
     <aside class="dashboard-notice" role="status">
       <div><strong>Hay registros con incidencias en este periodo.</strong><br>{{ dashboard.issue_summary.raw_rows_with_issues }} registros requieren revisión.</div>

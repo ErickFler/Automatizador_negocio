@@ -5,11 +5,11 @@
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Fecha inicial<input type="date" name="date_from" value="{{ report.context.filters.date_from.isoformat() }}"></label><label>Fecha final<input type="date" name="date_to" value="{{ report.context.filters.date_to.isoformat() }}"></label>
     {{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.metric_select(report.metric, metric_labels) }}{{ ui.apply_actions() }}
-  </form></section>{{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}
+  </form></section>{{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}{{ ui.financial_cards(report.financial) }}
   <section class="panel chart-panel report-chart"><div class="section-title simple-title"><div><h2>Comparación visual</h2><p>{{ metric_labels[report.metric] }}</p></div></div><div class="canvas-wrap"><canvas id="branch-chart" role="img" aria-label="Comparativo por {{ metric_labels[report.metric] }}"></canvas></div></section>
   {% if not report.has_data %}{{ ui.empty() }}{% endif %}
-  <section class="panel report-table"><h2>Las cuatro sucursales</h2><div class="table-wrap"><table><thead><tr><th>Sucursal</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th></tr></thead><tbody>
-    {% for row in report.rows %}<tr><td><strong>{{ row.branch_name }}</strong></td>{{ ui.metric_cells(row.metrics) }}</tr>{% endfor %}
+  <section class="panel report-table"><h2>Las cuatro sucursales</h2><div class="table-wrap"><table><thead><tr><th>Sucursal</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th><th class="number-cell">Costo</th><th class="number-cell">Utilidad</th><th class="number-cell">Margen</th><th class="number-cell">Cobertura</th></tr></thead><tbody>
+    {% for row in report.rows %}{% set finance = report.branch_financial[row.branch_id].financial %}<tr><td><strong>{{ row.branch_name }}</strong></td>{{ ui.metric_cells(row.metrics) }}<td class="number-cell">{% if finance.records_with_cost %}{{ finance.known_cost|money }}{% else %}No disponible{% endif %}</td><td class="number-cell">{% if finance.records_with_cost %}{{ finance.known_profit|money }}{% else %}No disponible{% endif %}</td><td class="number-cell">{{ finance.known_margin_percent|percent }}</td><td class="number-cell">{{ finance.sales_coverage_percent|percent }}</td></tr>{% endfor %}
   </tbody></table></div></section>
 {% endblock %}
 {% block scripts %}<script id="dashboard-chart-data" type="application/json">{{ report.chart_json|tojson }}</script><script src="{{ url_for('static', path='/js/dashboard.js') }}"></script>{% endblock %}

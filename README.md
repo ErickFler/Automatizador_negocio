@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7 y 8** están activas:
+Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7, 8 y 9** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -47,10 +47,13 @@ Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7 y 8** están activas:
 - importación trazable de costos desde Excel, con vigencia, homologación manual
   y detección de conflictos;
 - consulta de costo vigente, historial y productos todavía sin costo.
+- rentabilidad conocida basada en costos oficiales vigentes para cada venta;
+- costo consumido, utilidad, margen y cobertura por producto, categoría y
+  sucursal;
+- indicadores financieros en dashboard y reportes seleccionados.
 
-Rentabilidad, utilidad, margen, el constructor libre de reportes, exportación,
-launcher y empaquetado permanecen fuera del flujo activo hasta sus etapas
-correspondientes.
+El constructor libre de reportes, exportación, launcher y empaquetado permanecen
+fuera del flujo activo hasta sus etapas correspondientes.
 Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
@@ -202,3 +205,29 @@ producto maestro existente u omitirlos. El archivo original y su SHA-256 se
 conservan en `data/cost_uploads/`; un archivo repetido para la misma vigencia y
 un costo repetido para el mismo producto y fecha generan conflicto, nunca una
 sobrescritura silenciosa.
+
+## Rentabilidad conocida
+
+La fórmula oficial es `consumed_cost = total_units × effective_unit_cost` y
+`known_profit = sales_amount - consumed_cost`. El costo se aplica a todas las
+unidades físicas, incluidas las utilizadas en combos. Cada venta resuelve su
+propio costo histórico; un cambio de vigencia dentro del periodo no se aplica
+retroactivamente a ventas anteriores.
+
+El margen se calcula sobre la venta con costo conocido como
+`known_profit / sales_amount_with_known_cost × 100`. Nunca se suman ni se
+promedian porcentajes de filas: cada grupo recalcula su margen a partir de sus
+totales. Cuando la venta del grupo es cero, el margen no aplica.
+
+Las ventas sin costo oficial permanecen visibles, pero no aportan costo, utilidad
+ni margen conocidos. La cobertura por importe es
+`sales_amount_with_known_cost / total_sales_amount × 100`; si la venta total es
+cero, se muestra “No aplica” y se conserva además la cobertura por número de
+registros. Con ventas negativas auditables, el porcentaje por importe conserva
+los signos y puede quedar fuera del intervalo habitual de 0 a 100%.
+
+La utilidad por producto representa la venta directa atribuida a ese producto
+menos el costo físico de todas sus unidades consumidas. Los ingresos de combos
+no se redistribuyen entre sus componentes porque no existe todavía una regla de
+negocio aprobada para hacerlo; por ello, un componente de combo puede mostrar
+utilidad negativa sin que el sistema la corrija artificialmente.
