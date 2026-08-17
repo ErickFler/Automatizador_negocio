@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Index,
     Numeric,
     String,
     Text,
@@ -182,6 +183,14 @@ class RawSaleRecord(Base):
 
 class SaleRecord(Base):
     __tablename__ = "sale_records"
+    __table_args__ = (
+        Index(
+            "ix_sale_records_date_branch_master",
+            "sales_date",
+            "branch_id",
+            "master_product_id",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     import_batch_id: Mapped[int] = mapped_column(

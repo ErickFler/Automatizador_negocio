@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3 y 4** están activas:
+Las **Etapas 0, 1, 2, 3, 4 y 5** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -29,6 +29,11 @@ Las **Etapas 0, 1, 2, 3 y 4** están activas:
 - incidencias bloqueantes y anomalías auditables sin correcciones silenciosas;
 - reprocesamiento idempotente de ventas e incidencias de normalización;
 - totales básicos de verificación por carga.
+- motor histórico neutral para filtros y agregaciones por fecha, sucursal,
+  producto maestro y categoría;
+- series diarias, semanales ISO y mensuales;
+- comparativos por sucursal, producto maestro y categoría;
+- resumen separado de incidencias e histórico derivado de precios.
 
 La consolidación temporal, dashboard, reportes analíticos, costos administrados,
 exportación, launcher y empaquetado permanecen fuera del flujo activo hasta sus
@@ -117,3 +122,21 @@ y unidades cobradas mayores que la cantidad se preservan y generan incidencias.
 
 Al reprocesar se sustituyen exclusivamente las incidencias calculadas de Etapa 4;
 las incidencias de importación y homologación permanecen intactas.
+
+## Motor histórico
+
+`aggregation_service.py` consulta únicamente `SaleRecord` normalizados y usa
+`MasterProduct` como identidad universal. Las métricas permitidas se encuentran
+en una lista cerrada: `total_units`, `individual_sale_units`, `combo_units` y
+`sales_amount`. Las sumas se mantienen como `Decimal` y no incluyen filas crudas
+que no hayan producido una venta normalizada.
+
+Los rangos de fecha son inclusivos. Las semanas siguen ISO 8601: comienzan en
+lunes, terminan en domingo y el año ISO puede diferir del año calendario cerca
+de enero y diciembre. La consulta semanal de datos existentes devuelve solo
+semanas con ventas; al solicitar una serie anual completa se incluyen todas las
+semanas ISO faltantes con cero. Las series mensuales anuales completas devuelven
+enero a diciembre y rellenan meses sin datos con cero.
+
+La capa devuelve dataclasses independientes de HTML y Excel. Dashboard,
+gráficas, costos, utilidad, margen y exportación continúan fuera del flujo activo.
