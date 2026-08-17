@@ -8,8 +8,8 @@ def test_home_page() -> None:
         response = client.get("/")
 
     assert response.status_code == 200
-    assert "Sistema de Concentrado de Ventas" in response.text
-    assert "Aplicación funcionando correctamente" in response.text
+    assert "Control y análisis de ventas" in response.text
+    assert "Está viendo" in response.text
 
 
 def test_health_endpoint() -> None:

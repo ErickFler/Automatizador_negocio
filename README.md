@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3, 4 y 5** están activas:
+Las **Etapas 0, 1, 2, 3, 4, 5 y 6** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -34,10 +34,14 @@ Las **Etapas 0, 1, 2, 3, 4 y 5** están activas:
 - series diarias, semanales ISO y mensuales;
 - comparativos por sucursal, producto maestro y categoría;
 - resumen separado de incidencias e histórico derivado de precios.
+- dashboard local con periodos rápidos y rango personalizado;
+- filtros por sucursal, categoría y producto maestro;
+- tarjetas, gráficas temporal y por sucursal, y tabla de productos;
+- avisos visibles de incidencias y cargas pendientes.
 
-La consolidación temporal, dashboard, reportes analíticos, costos administrados,
-exportación, launcher y empaquetado permanecen fuera del flujo activo hasta sus
-etapas correspondientes.
+Los reportes analíticos independientes, costos administrados, exportación,
+launcher y empaquetado permanecen fuera del flujo activo hasta sus etapas
+correspondientes.
 Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
@@ -138,5 +142,19 @@ semanas con ventas; al solicitar una serie anual completa se incluyen todas las
 semanas ISO faltantes con cero. Las series mensuales anuales completas devuelven
 enero a diciembre y rellenan meses sin datos con cero.
 
-La capa devuelve dataclasses independientes de HTML y Excel. Dashboard,
-gráficas, costos, utilidad, margen y exportación continúan fuera del flujo activo.
+La capa devuelve dataclasses independientes de HTML y Excel. El dashboard
+consume exclusivamente esta API para sus métricas; no replica fórmulas de
+negocio en las rutas, plantillas ni JavaScript. Costos, utilidad, margen y
+exportación continúan fuera del flujo activo.
+
+## Dashboard
+
+La página principal `/` abre por defecto el mes actual. Permite elegir periodos
+rápidos o un rango personalizado y filtrar por sucursal, categoría y producto
+maestro. Las cuatro métricas disponibles son unidades totales, unidades de venta
+individual, unidades combo y Venta $.
+
+Las gráficas se dibujan con un recurso JavaScript local para que el sistema siga
+funcionando sin internet. Cada gráfica incluye también una tabla de valores
+accesible. Los parámetros recibidos por URL se validan contra listas cerradas y
+los valores inválidos regresan a una opción segura con un aviso visible.

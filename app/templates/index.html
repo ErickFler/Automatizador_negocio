@@ -1,20 +1,156 @@
 {% extends "base.html" %}
 
-{% block title %}Inicio · Concentrado de Ventas{% endblock %}
+{% block title %}Control y análisis de ventas{% endblock %}
 
 {% block content %}
-  <section class="hero">
+  <section class="dashboard-heading">
     <div>
-      <p class="eyebrow">Sistema local</p>
-      <h1>Sistema de Concentrado de Ventas</h1>
-      <p class="hero-copy">Carga reportes Excel y conserva cada fila original de forma segura.</p>
+      <p class="eyebrow">Resumen administrativo</p>
+      <h1>Control y análisis de ventas</h1>
+      <p class="period-heading">Está viendo: <strong>{{ dashboard.period_label }}</strong></p>
     </div>
-    <div class="status-pill"><span></span> Aplicación funcionando correctamente</div>
+    <a class="button button-primary button-prominent" href="/imports/new">Cargar ventas</a>
   </section>
 
-  <section class="panel empty-state">
-    <h2>Cargar reporte de ventas</h2>
-    <p>Indica la fecha, selecciona la sucursal y agrega el archivo descargado.</p>
-    <a class="button button-primary" href="/imports/new">Cargar ventas</a>
+  {% if dashboard.input_warning %}
+    <div class="alert alert-error" role="alert">{{ dashboard.input_warning }}</div>
+  {% endif %}
+
+  <section class="panel dashboard-filters" aria-labelledby="filter-title">
+    <div class="section-title simple-title">
+      <div><h2 id="filter-title">Filtros del dashboard</h2><p>Seleccione sus opciones y después presione Aplicar filtros.</p></div>
+    </div>
+    <form method="get" action="/" class="filter-grid">
+      <label for="period">Periodo
+        <select id="period" name="period">
+          {% for value, label in periods %}
+            <option value="{{ value }}" {% if dashboard.selection.period == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="date-from" class="custom-date-field">Fecha inicial
+        <input id="date-from" name="date_from" type="date" value="{{ dashboard.selection.date_from.isoformat() }}">
+      </label>
+      <label for="date-to" class="custom-date-field">Fecha final
+        <input id="date-to" name="date_to" type="date" value="{{ dashboard.selection.date_to.isoformat() }}">
+      </label>
+      <label for="branch">Sucursal
+        <select id="branch" name="branch">
+          <option value="">Todas las sucursales</option>
+          {% for item in dashboard.branches %}
+            <option value="{{ item.id }}" {% if dashboard.selection.branch_id == item.id %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="category">Categoría
+        <select id="category" name="category">
+          <option value="">Todas las categorías</option>
+          {% for item in dashboard.categories %}
+            <option value="{{ item.id }}" {% if dashboard.selection.category_id == item.id %}selected{% endif %}>{{ item.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="product">Producto
+        <select id="product" name="product">
+          <option value="">Todos los productos</option>
+          {% for item in dashboard.products %}
+            <option value="{{ item.id }}" {% if dashboard.selection.master_product_id == item.id %}selected{% endif %}>{{ item.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="metric">Mostrar en gráficas
+        <select id="metric" name="metric">
+          {% for value, label in metric_labels.items() %}
+            <option value="{{ value }}" {% if dashboard.selection.metric == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <input type="hidden" name="sort" value="{{ dashboard.selection.sort_by }}">
+      <input type="hidden" name="direction" value="{{ dashboard.selection.direction }}">
+      <div class="filter-actions">
+        <button class="button button-primary" type="submit">Aplicar filtros</button>
+        <a class="button button-secondary" href="/">Limpiar filtros</a>
+      </div>
+    </form>
   </section>
+
+  <section class="dashboard-cards" aria-label="Indicadores principales">
+    <article class="dashboard-card dashboard-card-money"><span>Venta $</span><strong>{{ dashboard.totals.sales_amount|money }}</strong></article>
+    <article class="dashboard-card"><span>Unidades totales</span><strong>{{ dashboard.totals.total_units|decimal }}</strong></article>
+    <article class="dashboard-card"><span>Unidades venta individual</span><strong>{{ dashboard.totals.individual_sale_units|decimal }}</strong></article>
+    <article class="dashboard-card"><span>Unidades combo</span><strong>{{ dashboard.totals.combo_units|decimal }}</strong></article>
+  </section>
+
+  {% if dashboard.issue_summary.raw_rows_with_issues %}
+    <aside class="dashboard-notice" role="status">
+      <div><strong>Hay registros con incidencias en este periodo.</strong><br>{{ dashboard.issue_summary.raw_rows_with_issues }} registros requieren revisión.</div>
+      <a href="/imports">Ver incidencias</a>
+    </aside>
+  {% endif %}
+  {% if dashboard.pending_batches %}
+    <aside class="dashboard-notice dashboard-notice-warning" role="status">
+      <div><strong>Hay cargas pendientes que todavía no forman parte de estos resultados.</strong><br>{{ dashboard.pending_batches }} cargas requieren atención.</div>
+      <a href="/imports">Revisar historial</a>
+    </aside>
+  {% endif %}
+
+  {% if not dashboard.has_sales %}
+    <section class="panel empty-state dashboard-empty">
+      <h2>No hay ventas registradas para este periodo y filtros.</h2>
+      <p>Puede elegir otro periodo o cargar un nuevo archivo de ventas.</p>
+      <a class="button button-primary" href="/imports/new">Cargar ventas</a>
+    </section>
+  {% else %}
+    <section class="dashboard-chart-grid" aria-label="Gráficas del periodo">
+      <article class="panel chart-panel">
+        <div class="section-title simple-title"><div><h2>Evolución del periodo</h2><p>{{ dashboard.temporal_chart.metric_label }}</p></div></div>
+        <div class="canvas-wrap"><canvas id="temporal-chart" role="img" aria-label="Evolución de {{ dashboard.temporal_chart.metric_label }}"></canvas></div>
+        <details class="chart-values"><summary>Ver valores de la gráfica</summary>
+          <table><thead><tr><th>Periodo</th><th>Valor</th></tr></thead><tbody>
+            {% for label in dashboard.temporal_chart.labels %}<tr><td>{{ label }}</td><td class="number-cell">{{ dashboard.temporal_chart.values[loop.index0] }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+      </article>
+      <article class="panel chart-panel">
+        <div class="section-title simple-title"><div><h2>Comparativo de sucursales</h2><p>{{ dashboard.branch_chart.metric_label }}</p></div></div>
+        <div class="canvas-wrap"><canvas id="branch-chart" role="img" aria-label="Comparativo de sucursales por {{ dashboard.branch_chart.metric_label }}"></canvas></div>
+        <details class="chart-values"><summary>Ver valores de la gráfica</summary>
+          <table><thead><tr><th>Sucursal</th><th>Valor</th></tr></thead><tbody>
+            {% for label in dashboard.branch_chart.labels %}<tr><td>{{ label }}</td><td class="number-cell">{{ dashboard.branch_chart.values[loop.index0] }}</td></tr>{% endfor %}
+          </tbody></table>
+        </details>
+      </article>
+    </section>
+
+    <section class="panel dashboard-products" aria-labelledby="products-title">
+      <div class="section-title simple-title"><div><h2 id="products-title">Productos</h2><p>Identidades maestras consolidadas para el periodo seleccionado.</p></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><a href="{{ dashboard.sort_links.name }}">Producto</a></th>
+            <th>Categoría</th>
+            <th class="number-cell"><a href="{{ dashboard.sort_links.total_units }}">Unidades totales</a></th>
+            <th class="number-cell"><a href="{{ dashboard.sort_links.individual_sale_units }}">Venta individual</a></th>
+            <th class="number-cell"><a href="{{ dashboard.sort_links.combo_units }}">Combo</a></th>
+            <th class="number-cell"><a href="{{ dashboard.sort_links.sales_amount }}">Venta $</a></th>
+          </tr></thead>
+          <tbody>
+            {% for row in dashboard.product_rows %}
+              <tr>
+                <td><strong>{{ row.product_name }}</strong></td><td>{{ row.category_name }}</td>
+                <td class="number-cell">{{ row.metrics.total_units|decimal }}</td>
+                <td class="number-cell">{{ row.metrics.individual_sale_units|decimal }}</td>
+                <td class="number-cell">{{ row.metrics.combo_units|decimal }}</td>
+                <td class="number-cell">{{ row.metrics.sales_amount|money }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  <script id="dashboard-chart-data" type="application/json">{{ dashboard.chart_json|tojson }}</script>
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script>{% endblock %}

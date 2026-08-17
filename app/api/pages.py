@@ -13,6 +13,14 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import DATA_ROOT, RESOURCE_ROOT
 from app.db.database import get_db
 from app.db.models import Branch, ImportBatch, ProcessingIssue, RawSaleRecord
+from app.presentation.formatters import format_date_mx, format_decimal, format_money
+from app.services.dashboard_service import (
+    METRIC_LABELS,
+    PERIODS,
+    DashboardInputError,
+    build_dashboard,
+    with_input_error,
+)
 from app.services.duplicate_service import DuplicateImportError
 from app.services.product_catalog import list_products_for_inspection
 from app.services.product_mapping import (
@@ -36,6 +44,9 @@ from app.services.sales_processing_service import (
 
 TEMPLATE_DIRECTORY = RESOURCE_ROOT / "app" / "templates"
 templates = Jinja2Templates(directory=TEMPLATE_DIRECTORY)
+templates.env.filters["decimal"] = format_decimal
+templates.env.filters["money"] = format_money
+templates.env.filters["date_mx"] = format_date_mx
 router = APIRouter()
 UPLOAD_DIRECTORY = DATA_ROOT / "uploads"
 STATUS_LABELS = {
@@ -49,8 +60,46 @@ STATUS_LABELS = {
 
 
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="index.html")
+def home(
+    request: Request,
+    period: str = "this_month",
+    date_from: str = "",
+    date_to: str = "",
+    branch: str = "",
+    category: str = "",
+    product: str = "",
+    metric: str = "total_units",
+    sort: str = "sales_amount",
+    direction: str = "desc",
+    session: Session = Depends(get_db),
+) -> HTMLResponse:
+    status_code = status.HTTP_200_OK
+    try:
+        dashboard = build_dashboard(
+            session,
+            period=period,
+            date_from=date_from,
+            date_to=date_to,
+            branch=branch,
+            category=category,
+            product=product,
+            metric=metric,
+            sort_by=sort,
+            direction=direction,
+        )
+    except DashboardInputError as exc:
+        dashboard = with_input_error(build_dashboard(session), str(exc))
+        status_code = status.HTTP_400_BAD_REQUEST
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "dashboard": dashboard,
+            "periods": PERIODS,
+            "metric_labels": METRIC_LABELS,
+        },
+        status_code=status_code,
+    )
 
 
 @router.get("/products", response_class=HTMLResponse)

@@ -64,7 +64,7 @@ def test_home_exposes_raw_import_navigation(
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "Sistema de Concentrado de Ventas" in response.text
+    assert "Control y análisis de ventas" in response.text
     assert "Cargar ventas" in response.text
     assert 'action="/uploads"' not in response.text
     assert "Apagar sistema" not in response.text
