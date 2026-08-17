@@ -87,10 +87,15 @@ def _batch(
                 external_product_id=external_id,
                 original_product_name=name,
                 original_category_name=category,
+                quantity_raw="1",
+                sale_price_raw="50",
+                cost_raw="20",
+                amount_raw="50",
+                total_amount_raw="50",
             )
         )
     batch.total_rows = len(products or [("", "", None)])
-    batch.valid_rows = batch.total_rows
+    batch.normalized_rows = 0
     session.commit()
     return batch
 

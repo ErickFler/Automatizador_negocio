@@ -1,17 +1,19 @@
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
-MISSING_QUANTITY = "MISSING_QUANTITY"
+MISSING_TOTAL_UNITS = "MISSING_TOTAL_UNITS"
 MISSING_SALE_PRICE = "MISSING_SALE_PRICE"
-MISSING_TOTAL_AMOUNT = "MISSING_TOTAL_AMOUNT"
+MISSING_SALES_AMOUNT = "MISSING_SALES_AMOUNT"
 INVALID_CALCULATION_VALUE = "INVALID_CALCULATION_VALUE"
 ZERO_SALE_PRICE = "ZERO_SALE_PRICE"
-NEGATIVE_QUANTITY = "NEGATIVE_QUANTITY"
+NEGATIVE_TOTAL_UNITS = "NEGATIVE_TOTAL_UNITS"
 NEGATIVE_SALE_PRICE = "NEGATIVE_SALE_PRICE"
-NEGATIVE_TOTAL_AMOUNT = "NEGATIVE_TOTAL_AMOUNT"
-NEGATIVE_REAL_UNITS = "NEGATIVE_REAL_UNITS"
-NON_INTEGER_REAL_UNITS = "NON_INTEGER_REAL_UNITS"
-REAL_UNITS_GREATER_THAN_QUANTITY = "REAL_UNITS_GREATER_THAN_QUANTITY"
+NEGATIVE_SALES_AMOUNT = "NEGATIVE_SALES_AMOUNT"
+NEGATIVE_INDIVIDUAL_SALE_UNITS = "NEGATIVE_INDIVIDUAL_SALE_UNITS"
+NON_INTEGER_INDIVIDUAL_SALE_UNITS = "NON_INTEGER_INDIVIDUAL_SALE_UNITS"
+INDIVIDUAL_SALE_UNITS_EXCEED_TOTAL_UNITS = (
+    "INDIVIDUAL_SALE_UNITS_EXCEED_TOTAL_UNITS"
+)
 NEGATIVE_COMBO_UNITS = "NEGATIVE_COMBO_UNITS"
 
 
@@ -24,51 +26,54 @@ class CalculationWarning:
 
 @dataclass(frozen=True, slots=True)
 class UnitsCalculationResult:
-    real_units: Decimal | None
+    total_units: Decimal | None
+    individual_sale_units: Decimal | None
     combo_units: Decimal | None
     warnings: tuple[CalculationWarning, ...]
 
 
-def calculate_real_units(
-    total_amount: Decimal | None, sale_price: Decimal | None
+def calculate_individual_sale_units(
+    sales_amount: Decimal | None, sale_price: Decimal | None
 ) -> Decimal | None:
     """Calcula ImporteTotal / PrecioVenta sin redondear ni corregir valores."""
     if (
-        total_amount is None
+        sales_amount is None
         or sale_price is None
-        or not total_amount.is_finite()
+        or not sales_amount.is_finite()
         or not sale_price.is_finite()
         or sale_price == 0
     ):
         return None
-    return total_amount / sale_price
+    with localcontext() as context:
+        context.prec = 28
+        return sales_amount / sale_price
 
 
 def calculate_combo_units(
-    quantity: Decimal | None, real_units: Decimal | None
+    total_units: Decimal | None, individual_sale_units: Decimal | None
 ) -> Decimal | None:
-    """Calcula Cantidad - UnidadesReales sin alterar la cantidad registrada."""
+    """Calcula Cantidad - UnidadesCobradas sin alterar la cantidad registrada."""
     if (
-        quantity is None
-        or real_units is None
-        or not quantity.is_finite()
-        or not real_units.is_finite()
+        total_units is None
+        or individual_sale_units is None
+        or not total_units.is_finite()
+        or not individual_sale_units.is_finite()
     ):
         return None
-    return quantity - real_units
+    return total_units - individual_sale_units
 
 
 def calculate_units(
     *,
-    quantity: Decimal | None,
+    total_units: Decimal | None,
     sale_price: Decimal | None,
-    total_amount: Decimal | None,
+    sales_amount: Decimal | None,
 ) -> UnitsCalculationResult:
     """Aplica las fórmulas aprobadas y detecta casos que requieren revisión."""
     values = {
-        "quantity": quantity,
+        "total_units": total_units,
         "sale_price": sale_price,
-        "total_amount": total_amount,
+        "sales_amount": sales_amount,
     }
     warnings: list[CalculationWarning] = []
 
@@ -86,17 +91,17 @@ def calculate_units(
             )
         )
 
-    valid_quantity = None if "quantity" in invalid_fields else quantity
+    valid_total_units = None if "total_units" in invalid_fields else total_units
     valid_sale_price = None if "sale_price" in invalid_fields else sale_price
-    valid_total_amount = None if "total_amount" in invalid_fields else total_amount
+    valid_sales_amount = None if "sales_amount" in invalid_fields else sales_amount
 
-    if quantity is None:
+    if total_units is None:
         warnings.append(
-            _warning(MISSING_QUANTITY, "Cantidad está vacía.", values)
+            _warning(MISSING_TOTAL_UNITS, "Unidades totales está vacío.", values)
         )
-    elif valid_quantity is not None and valid_quantity < 0:
+    elif valid_total_units is not None and valid_total_units < 0:
         warnings.append(
-            _warning(NEGATIVE_QUANTITY, "Cantidad es negativa.", values)
+            _warning(NEGATIVE_TOTAL_UNITS, "Unidades totales es negativo.", values)
         )
 
     if sale_price is None:
@@ -116,40 +121,45 @@ def calculate_units(
             _warning(NEGATIVE_SALE_PRICE, "PrecioVenta es negativo.", values)
         )
 
-    if total_amount is None:
+    if sales_amount is None:
         warnings.append(
-            _warning(MISSING_TOTAL_AMOUNT, "ImporteTotal está vacío.", values)
+            _warning(MISSING_SALES_AMOUNT, "Venta $ está vacía.", values)
         )
-    elif valid_total_amount is not None and valid_total_amount < 0:
+    elif valid_sales_amount is not None and valid_sales_amount < 0:
         warnings.append(
-            _warning(NEGATIVE_TOTAL_AMOUNT, "ImporteTotal es negativo.", values)
+            _warning(NEGATIVE_SALES_AMOUNT, "Venta $ es negativa.", values)
         )
 
-    real_units = calculate_real_units(valid_total_amount, valid_sale_price)
-    combo_units = calculate_combo_units(valid_quantity, real_units)
+    individual_sale_units = calculate_individual_sale_units(
+        valid_sales_amount, valid_sale_price
+    )
+    combo_units = calculate_combo_units(valid_total_units, individual_sale_units)
 
-    if real_units is not None:
-        if real_units < 0:
+    if individual_sale_units is not None:
+        if individual_sale_units < 0:
             warnings.append(
                 _warning(
-                    NEGATIVE_REAL_UNITS,
-                    "UnidadesReales es negativo.",
+                    NEGATIVE_INDIVIDUAL_SALE_UNITS,
+                    "Las unidades de venta individual son negativas.",
                     values,
                 )
             )
-        if real_units != real_units.to_integral_value():
+        if individual_sale_units != individual_sale_units.to_integral_value():
             warnings.append(
                 _warning(
-                    NON_INTEGER_REAL_UNITS,
-                    "UnidadesReales no es un número entero.",
+                    NON_INTEGER_INDIVIDUAL_SALE_UNITS,
+                    "Las unidades de venta individual no son un número entero.",
                     values,
                 )
             )
-        if valid_quantity is not None and real_units > valid_quantity:
+        if (
+            valid_total_units is not None
+            and individual_sale_units > valid_total_units
+        ):
             warnings.append(
                 _warning(
-                    REAL_UNITS_GREATER_THAN_QUANTITY,
-                    "UnidadesReales es mayor que Cantidad.",
+                    INDIVIDUAL_SALE_UNITS_EXCEED_TOTAL_UNITS,
+                    "Las unidades de venta individual son mayores que las unidades totales.",
                     values,
                 )
             )
@@ -164,7 +174,8 @@ def calculate_units(
         )
 
     return UnitsCalculationResult(
-        real_units=real_units,
+        total_units=valid_total_units,
+        individual_sale_units=individual_sale_units,
         combo_units=combo_units,
         warnings=tuple(warnings),
     )

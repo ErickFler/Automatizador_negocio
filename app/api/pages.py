@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import DATA_ROOT, RESOURCE_ROOT
 from app.db.database import get_db
-from app.db.models import Branch, ImportBatch, RawSaleRecord
+from app.db.models import Branch, ImportBatch, ProcessingIssue, RawSaleRecord
 from app.services.duplicate_service import DuplicateImportError
 from app.services.product_catalog import list_products_for_inspection
 from app.services.product_mapping import (
@@ -24,7 +24,15 @@ from app.services.product_matching import (
     find_product_candidates,
     search_master_products,
 )
-from app.services.raw_import_service import import_raw_sales_file
+from app.services.raw_import_service import (
+    FAILED,
+    WAITING_FOR_PRODUCT_MAPPING,
+    import_raw_sales_file,
+)
+from app.services.sales_processing_service import (
+    get_batch_sales_summary,
+    process_normalized_sales_batch,
+)
 
 TEMPLATE_DIRECTORY = RESOURCE_ROOT / "app" / "templates"
 templates = Jinja2Templates(directory=TEMPLATE_DIRECTORY)
@@ -104,6 +112,8 @@ def create_import(
                 branch=branch,
                 upload_directory=UPLOAD_DIRECTORY,
             )
+            if result.status not in {WAITING_FOR_PRODUCT_MAPPING, FAILED}:
+                process_normalized_sales_batch(session, batch_id=result.batch_id)
     except DuplicateImportError as exc:
         session.rollback()
         return _render_import_form(
@@ -123,19 +133,7 @@ def create_import(
     finally:
         file.file.close()
 
-    batch = session.scalar(
-        select(ImportBatch)
-        .options(
-            selectinload(ImportBatch.branch),
-            selectinload(ImportBatch.processing_issues),
-        )
-        .where(ImportBatch.id == result.batch_id)
-    )
-    return templates.TemplateResponse(
-        request=request,
-        name="import_result.html",
-        context={"batch": batch, "status_labels": STATUS_LABELS},
-    )
+    return _render_import_result(request, session, batch_id=result.batch_id)
 
 
 @router.get("/imports", response_class=HTMLResponse)
@@ -153,6 +151,13 @@ def import_history(
         name="imports_history.html",
         context={"batches": batches, "status_labels": STATUS_LABELS},
     )
+
+
+@router.get("/imports/{batch_id}", response_class=HTMLResponse)
+def import_result(
+    request: Request, batch_id: int, session: Session = Depends(get_db)
+) -> HTMLResponse:
+    return _render_import_result(request, session, batch_id=batch_id)
 
 
 @router.get("/imports/{batch_id}/products", response_class=HTMLResponse)
@@ -196,8 +201,13 @@ def confirm_existing_product(
             error=str(exc),
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+    pending = list_pending_products(session, batch_id=batch_id)
     return RedirectResponse(
-        url=f"/imports/{batch_id}/products?saved=true",
+        url=(
+            f"/imports/{batch_id}/products?saved=true"
+            if pending
+            else f"/imports/{batch_id}"
+        ),
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -228,8 +238,13 @@ def confirm_new_product(
             error=str(exc),
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+    pending = list_pending_products(session, batch_id=batch_id)
     return RedirectResponse(
-        url=f"/imports/{batch_id}/products?saved=true",
+        url=(
+            f"/imports/{batch_id}/products?saved=true"
+            if pending
+            else f"/imports/{batch_id}"
+        ),
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -249,6 +264,37 @@ def _render_import_form(
         name="import_new.html",
         context={"branches": branches, "error": error},
         status_code=status_code,
+    )
+
+
+def _render_import_result(
+    request: Request, session: Session, *, batch_id: int
+) -> HTMLResponse:
+    batch = session.scalar(
+        select(ImportBatch)
+        .options(
+            selectinload(ImportBatch.branch),
+            selectinload(ImportBatch.processing_issues).selectinload(
+                ProcessingIssue.raw_sale_record
+            ),
+        )
+        .where(ImportBatch.id == batch_id)
+    )
+    if batch is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="import_result.html",
+            context={"batch": None, "status_labels": STATUS_LABELS},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="import_result.html",
+        context={
+            "batch": batch,
+            "summary": get_batch_sales_summary(session, batch_id=batch_id),
+            "status_labels": STATUS_LABELS,
+        },
     )
 
 

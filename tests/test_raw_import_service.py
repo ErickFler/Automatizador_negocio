@@ -142,8 +142,9 @@ def test_valid_workbook_creates_completed_batch_and_preserves_file(
     assert stored.read_bytes() == source.read_bytes()
     assert stored.name != source.name
     assert batch.total_rows == 2
-    assert batch.valid_rows == 2
-    assert batch.warning_rows == 0
+    assert batch.normalized_rows == 0
+    assert batch.issue_rows == 0
+    assert batch.skipped_rows == 0
 
 
 @pytest.mark.parametrize(
@@ -292,8 +293,9 @@ def test_invalid_numeric_row_is_preserved_and_creates_issue(
 
     assert result.status == COMPLETED_WITH_WARNINGS
     assert result.total_rows == 2
-    assert result.valid_rows == 1
+    assert result.normalized_rows == 0
     assert result.issue_rows == 1
+    assert result.skipped_rows == 0
     assert invalid_record.sale_price_raw == "ERROR"
     assert issue is not None
     assert issue.issue_type == "INVALID_NUMERIC_VALUE"

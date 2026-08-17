@@ -17,10 +17,10 @@
     <article><span>Registros guardados</span><strong>{{ summary.valid_rows }}</strong></article>
     <article><span>Incidencias</span><strong>{{ summary.warnings }}</strong></article>
     <article><span>Productos nuevos</span><strong>{{ summary.new_products }}</strong></article>
-    <article><span>Cantidad registrada</span><strong>{{ summary.quantity }}</strong></article>
-    <article><span>Unidades reales</span><strong>{{ summary.real_units }}</strong></article>
+    <article><span>Unidades totales</span><strong>{{ summary.total_units }}</strong></article>
+    <article><span>Unidades venta individual</span><strong>{{ summary.individual_sale_units }}</strong></article>
     <article><span>Unidades combo</span><strong>{{ summary.combo_units }}</strong></article>
-    <article class="metric-money"><span>Importe total</span><strong>${{ summary.total_amount }}</strong></article>
+    <article class="metric-money"><span>Venta $</span><strong>${{ summary.sales_amount }}</strong></article>
   </section>
 
   <section class="panel">
@@ -55,4 +55,3 @@
     <a class="button button-secondary" href="/products">Catálogo de productos</a>
   </div>
 {% endblock %}
-

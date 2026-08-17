@@ -1,33 +1,13 @@
-from typing import Never
+"""Punto de compatibilidad para el procesador normalizado vigente.
 
-from app.services.raw_import_service import (
-    COMPLETED,
-    COMPLETED_WITH_WARNINGS,
-    FAILED,
-    PENDING,
-    PROCESSING,
-    WAITING_FOR_PRODUCT_MAPPING,
+El pipeline monolítico que leía Excel y creaba productos automáticamente ya no
+forma parte del código activo. El servicio oficial recibe únicamente lotes
+crudos previamente importados y productos confirmados.
+"""
+
+from app.services.sales_processing_service import (
+    BatchProcessingResult,
+    process_normalized_sales_batch,
 )
 
-
-def process_sales_file(*_: object, **__: object) -> Never:
-    """Bloquea el pipeline monolítico del prototipo anterior.
-
-    Las cargas activas deben pasar por raw_import_service y product_mapping.
-    SaleRecord y los cálculos se implementarán en la Etapa 4.
-    """
-    raise RuntimeError(
-        "El procesador anterior fue retirado. Usa el flujo de importación cruda "
-        "y homologación confirmado."
-    )
-
-
-__all__ = [
-    "COMPLETED",
-    "COMPLETED_WITH_WARNINGS",
-    "FAILED",
-    "PENDING",
-    "PROCESSING",
-    "WAITING_FOR_PRODUCT_MAPPING",
-    "process_sales_file",
-]
+__all__ = ["BatchProcessingResult", "process_normalized_sales_batch"]

@@ -43,8 +43,9 @@ class RawImportResult:
     batch_id: int
     status: str
     total_rows: int
-    valid_rows: int
+    normalized_rows: int
     issue_rows: int
+    skipped_rows: int
     issue_count: int
 
 
@@ -97,8 +98,9 @@ def import_raw_sales_file(
             batch_id=batch.id,
             status=FAILED,
             total_rows=0,
-            valid_rows=0,
+            normalized_rows=0,
             issue_rows=0,
+            skipped_rows=0,
             issue_count=1,
         )
     except Exception:
@@ -188,8 +190,9 @@ def import_raw_sales_file(
                         issue_count += 1
 
             batch.total_rows = read_result.total_rows
-            batch.valid_rows = read_result.total_rows - len(issue_rows)
-            batch.warning_rows = len(issue_rows)
+            batch.normalized_rows = 0
+            batch.issue_rows = len(issue_rows)
+            batch.skipped_rows = 0
             if unknown_external_ids:
                 batch.status = WAITING_FOR_PRODUCT_MAPPING
             else:
@@ -218,8 +221,9 @@ def import_raw_sales_file(
         batch_id=batch.id,
         status=batch.status,
         total_rows=batch.total_rows,
-        valid_rows=batch.valid_rows,
-        issue_rows=batch.warning_rows,
+        normalized_rows=batch.normalized_rows,
+        issue_rows=batch.issue_rows,
+        skipped_rows=batch.skipped_rows,
         issue_count=issue_count,
     )
 
@@ -236,8 +240,9 @@ def _mark_failed(
         raise RuntimeError("No fue posible recuperar la carga fallida.")
     batch.status = FAILED
     batch.total_rows = 0
-    batch.valid_rows = 0
-    batch.warning_rows = 0
+    batch.normalized_rows = 0
+    batch.issue_rows = 0
+    batch.skipped_rows = 0
     batch.error_message = message
     session.add(
         ProcessingIssue(

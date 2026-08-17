@@ -72,7 +72,9 @@ class MasterProduct(TimestampMixin, Base):
     branch_products: Mapped[list["BranchProduct"]] = relationship(
         back_populates="master_product"
     )
-    sale_records: Mapped[list["SaleRecord"]] = relationship(back_populates="product")
+    sale_records: Mapped[list["SaleRecord"]] = relationship(
+        back_populates="master_product"
+    )
 
 
 class BranchProduct(TimestampMixin, Base):
@@ -103,6 +105,9 @@ class BranchProduct(TimestampMixin, Base):
     master_product: Mapped[MasterProduct] = relationship(
         back_populates="branch_products"
     )
+    sale_records: Mapped[list["SaleRecord"]] = relationship(
+        back_populates="branch_product"
+    )
 
 
 class ImportBatch(Base):
@@ -126,8 +131,9 @@ class ImportBatch(Base):
     sha256: Mapped[str] = mapped_column(String(64), index=True)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     total_rows: Mapped[int] = mapped_column(Integer, default=0)
-    valid_rows: Mapped[int] = mapped_column(Integer, default=0)
-    warning_rows: Mapped[int] = mapped_column(Integer, default=0)
+    normalized_rows: Mapped[int] = mapped_column(Integer, default=0)
+    issue_rows: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_rows: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(40), default="PENDING", index=True)
     error_message: Mapped[str | None] = mapped_column(Text)
 
@@ -169,32 +175,47 @@ class RawSaleRecord(Base):
     processing_issues: Mapped[list["ProcessingIssue"]] = relationship(
         back_populates="raw_sale_record", cascade="all, delete-orphan"
     )
+    sale_record: Mapped["SaleRecord | None"] = relationship(
+        back_populates="raw_sale_record", uselist=False
+    )
 
 
 class SaleRecord(Base):
     __tablename__ = "sale_records"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    batch_id: Mapped[int] = mapped_column(ForeignKey("import_batches.id"), index=True)
-    product_id: Mapped[int] = mapped_column(
-        ForeignKey("master_products.id"), index=True
+    import_batch_id: Mapped[int] = mapped_column(
+        ForeignKey("import_batches.id"), index=True, nullable=False
     )
-    sales_date: Mapped[date] = mapped_column(Date, index=True)
+    raw_sale_record_id: Mapped[int] = mapped_column(
+        ForeignKey("raw_sale_records.id"), unique=True, index=True, nullable=False
+    )
     branch_id: Mapped[int] = mapped_column(
         ForeignKey("branches.id"), index=True, nullable=False
     )
-    quantity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    sale_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    cost_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    total_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    real_units: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    combo_units: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
-    source_row_number: Mapped[int] = mapped_column(Integer)
+    branch_product_id: Mapped[int] = mapped_column(
+        ForeignKey("branch_products.id"), index=True, nullable=False
+    )
+    master_product_id: Mapped[int] = mapped_column(
+        ForeignKey("master_products.id"), index=True, nullable=False
+    )
+    sales_date: Mapped[date] = mapped_column(Date, index=True)
+    total_units: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    sale_price: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    original_cost: Mapped[Decimal | None] = mapped_column(Numeric(28, 12))
+    original_amount: Mapped[Decimal | None] = mapped_column(Numeric(28, 12))
+    sales_amount: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    individual_sale_units: Mapped[Decimal] = mapped_column(
+        Numeric(28, 12), nullable=False
+    )
+    combo_units: Mapped[Decimal] = mapped_column(Numeric(28, 12), nullable=False)
+    source_row_number: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     batch: Mapped[ImportBatch] = relationship(back_populates="sale_records")
-    product: Mapped[MasterProduct] = relationship(back_populates="sale_records")
+    raw_sale_record: Mapped[RawSaleRecord] = relationship(back_populates="sale_record")
+    branch_product: Mapped[BranchProduct] = relationship(back_populates="sale_records")
+    master_product: Mapped[MasterProduct] = relationship(back_populates="sale_records")
     branch: Mapped[Branch] = relationship(back_populates="sale_records")
 
 

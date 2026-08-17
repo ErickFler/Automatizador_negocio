@@ -3,6 +3,9 @@
 {% block title %}Resultado de la carga · Concentrado de Ventas{% endblock %}
 
 {% block content %}
+  {% if not batch %}
+    <section class="panel empty-state"><h1>Carga no encontrada</h1></section>
+  {% else %}
   <section class="hero compact">
     <div>
       <p class="eyebrow">Resultado</p>
@@ -17,9 +20,22 @@
     <article><span>Sucursal</span><strong>{{ batch.branch.name }}</strong></article>
     <article><span>Estado</span><strong>{{ status_labels[batch.status] }}</strong></article>
     <article><span>Total de filas</span><strong>{{ batch.total_rows }}</strong></article>
-    <article><span>Filas sin incidencias</span><strong>{{ batch.valid_rows }}</strong></article>
-    <article><span>Filas con incidencias</span><strong>{{ batch.warning_rows }}</strong></article>
+    <article><span>Ventas procesadas</span><strong>{{ batch.normalized_rows }}</strong></article>
+    <article><span>Filas con incidencias</span><strong>{{ batch.issue_rows }}</strong></article>
+    <article><span>Filas omitidas</span><strong>{{ batch.skipped_rows }}</strong></article>
   </section>
+
+  {% if batch.normalized_rows %}
+    <section class="panel">
+      <h2>Totales de verificación</h2>
+      <div class="summary-grid">
+        <article><span>Unidades totales</span><strong>{{ summary.total_units }}</strong></article>
+        <article><span>Unidades venta individual</span><strong>{{ summary.individual_sale_units }}</strong></article>
+        <article><span>Unidades combo</span><strong>{{ summary.combo_units }}</strong></article>
+        <article><span>Venta $</span><strong>{{ summary.sales_amount }}</strong></article>
+      </div>
+    </section>
+  {% endif %}
 
   {% if batch.status == 'WAITING_FOR_PRODUCT_MAPPING' %}
     <section class="panel empty-state">
@@ -47,5 +63,6 @@
         </table>
       </div>
     </section>
+  {% endif %}
   {% endif %}
 {% endblock %}

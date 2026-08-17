@@ -19,8 +19,8 @@
                 <td>{{ batch.sales_date.strftime('%d/%m/%Y') }}</td>
                 <td>{{ batch.branch }}</td>
                 <td>{{ batch.source_filename }}</td>
-                <td>{{ batch.valid_rows }} / {{ batch.total_rows }}</td>
-                <td>{{ batch.warning_rows }}</td>
+                <td>{{ batch.normalized_rows }} / {{ batch.total_rows }}</td>
+                <td>{{ batch.issue_rows }}</td>
                 <td><span class="badge {{ 'badge-success' if batch.status.startswith('COMPLETED') else 'badge-error' }}">{{ batch.status }}</span></td>
                 <td>{% if batch.status.startswith('COMPLETED') %}<a href="/history/{{ batch.id }}/export">Exportar</a>{% endif %}</td>
               </tr>
@@ -33,4 +33,3 @@
     {% endif %}
   </section>
 {% endblock %}
-

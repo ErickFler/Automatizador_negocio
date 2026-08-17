@@ -155,7 +155,7 @@ def test_upload_with_invalid_value_shows_friendly_issue(
     assert response.status_code == 200
     assert "Completada con incidencias" in response.text
     assert "PrecioVenta no contiene un número válido" in response.text
-    assert "ERROR" not in response.text
+    assert "valor recibido: &#39;ERROR&#39;" in response.text
 
 
 def test_mapping_screen_can_confirm_an_existing_product(
@@ -190,7 +190,14 @@ def test_mapping_screen_can_confirm_an_existing_product(
     assert "Confirmar productos nuevos" in mapping_page.text
     assert "Coca Cola 3 L" in mapping_page.text
     assert response.status_code == 200
-    assert "Todos los productos están confirmados" in response.text
+    assert "Archivo procesado" in response.text
+    assert "Ventas procesadas" in response.text
+    assert "Unidades totales" in response.text
+    assert "Unidades venta individual" in response.text
+    assert "Unidades combo" in response.text
+    assert "Venta $" in response.text
+    assert "Unidades reales" not in response.text
+    assert "Unidades cobradas" not in response.text
     assert session.get(ImportBatch, batch.id).status == "COMPLETED"
 
 
@@ -221,7 +228,9 @@ def test_mapping_screen_can_create_a_new_product(
     )
 
     assert response.status_code == 200
-    assert "Todos los productos están confirmados" in response.text
+    assert "Archivo procesado" in response.text
+    assert "Ventas procesadas" in response.text
+    assert "Unidades venta individual" in response.text
     products = client.get("/products")
     assert "Pastel de Chocolate" in products.text
     assert "PASTEL CHOCOLATE" in products.text

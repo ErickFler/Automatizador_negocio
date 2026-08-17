@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2 y 3** están activas:
+Las **Etapas 0, 1, 2, 3 y 4** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -23,9 +23,16 @@ Las **Etapas 0, 1, 2 y 3** están activas:
 - confirmación persistente de equivalencias por sucursal;
 - creación manual y confirmada de productos maestros;
 - auditoría de cambios de nombre y categoría recibidos.
+- conversión numérica explícita con `Decimal`, sin sustituir errores por cero;
+- normalización trazable de cada fila cruda a `SaleRecord`;
+- cálculo centralizado de unidades de venta individual y unidades combo;
+- incidencias bloqueantes y anomalías auditables sin correcciones silenciosas;
+- reprocesamiento idempotente de ventas e incidencias de normalización;
+- totales básicos de verificación por carga.
 
-Los cálculos, consolidación, reportes analíticos, exportación, launcher y
-empaquetado permanecen fuera del flujo activo hasta sus etapas correspondientes.
+La consolidación temporal, dashboard, reportes analíticos, costos administrados,
+exportación, launcher y empaquetado permanecen fuera del flujo activo hasta sus
+etapas correspondientes.
 Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
@@ -88,3 +95,25 @@ usuario puede relacionar cada producto con uno existente o crear un producto
 maestro nuevo. La decisión se guarda por sucursal e ID local, por lo que futuras
 cargas reutilizan la equivalencia sin volver a preguntar. Las sugerencias nunca
 crean relaciones automáticamente.
+
+## Normalización de ventas
+
+Al quedar homologado el último producto, el lote se normaliza automáticamente;
+el servicio también puede reejecutarse de forma independiente. Cada venta apunta
+a su lote, fila cruda, sucursal, producto local y producto maestro, y existe una
+restricción única sobre `raw_sale_record_id`.
+
+La fórmula oficial es `individual_sale_units = sales_amount / sale_price` y
+`combo_units = total_units - individual_sale_units`. `total_units` conserva
+`Cantidad` y `sales_amount` conserva `ImporteTotal`. `Costo` e `Importe` se conservan como
+datos originales normalizados cuando son válidos, pero no participan en esas
+fórmulas. Los campos monetarios y de unidades usan `Decimal`; SQLite conserva
+hasta 12 decimales y no se aplica tolerancia ni redondeo de negocio.
+
+Cantidad, precio de venta o importe total ilegibles, así como precio de venta
+cero, omiten únicamente la venta normalizada de esa fila. Costo o importe
+original ilegibles no bloquean la venta. Resultados no enteros, valores negativos
+y unidades cobradas mayores que la cantidad se preservan y generan incidencias.
+
+Al reprocesar se sustituyen exclusivamente las incidencias calculadas de Etapa 4;
+las incidencias de importación y homologación permanecen intactas.

@@ -111,6 +111,7 @@ def map_to_existing_product(
             session, batch_id=batch.id, commit=False
         )
         session.commit()
+        _process_if_mapping_complete(session, batch.id)
         return branch_product
     except Exception:
         session.rollback()
@@ -149,6 +150,7 @@ def create_and_map_product(
             session, batch_id=batch.id, commit=False
         )
         session.commit()
+        _process_if_mapping_complete(session, batch.id)
         return branch_product
     except Exception:
         session.rollback()
@@ -234,3 +236,13 @@ def _record_category_mismatch(
             ),
         )
     )
+
+
+def _process_if_mapping_complete(session: Session, batch_id: int) -> None:
+    if list_pending_products(session, batch_id=batch_id):
+        return
+    # Importación y normalización siguen siendo servicios reejecutables separados;
+    # este punto solo orquesta el flujo sencillo al confirmar el último producto.
+    from app.services.sales_processing_service import process_normalized_sales_batch
+
+    process_normalized_sales_batch(session, batch_id=batch_id)
