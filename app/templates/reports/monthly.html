@@ -4,7 +4,7 @@
   {{ ui.heading("Histórico mensual", "¿Cómo se comportó cada mes del año?") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Año<input type="number" min="2000" max="2100" name="year" value="{{ report.year }}"></label>
-    {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.metric_select(report.metric, metric_labels) }}{{ ui.apply_actions() }}
+    {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.metric_select(report.metric, metric_labels) }}{{ ui.apply_actions('/reports/monthly/export') }}
   </form></section>{{ ui.summary(report.context) }}
   <section class="panel chart-panel report-chart"><div class="section-title simple-title"><div><h2>Evolución mensual</h2><p>{{ metric_labels[report.metric] }}</p></div></div><div class="canvas-wrap"><canvas id="temporal-chart" role="img" aria-label="Evolución mensual de {{ metric_labels[report.metric] }}"></canvas></div></section>
   {% if not report.has_data %}{{ ui.empty() }}{% endif %}

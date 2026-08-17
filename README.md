@@ -5,7 +5,7 @@ sucursales: Loma Linda, Solidaridad, Alianza y Unidad.
 
 ## Estado
 
-Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7, 8 y 9** están activas:
+Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 y 10** están activas:
 
 - fundación FastAPI, Jinja2, SQLite, SQLAlchemy, logging y pytest;
 - sucursales persistentes con seed idempotente;
@@ -51,9 +51,13 @@ Las **Etapas 0, 1, 2, 3, 4, 5, 6, 7, 8 y 9** están activas:
 - costo consumido, utilidad, margen y cobertura por producto, categoría y
   sucursal;
 - indicadores financieros en dashboard y reportes seleccionados.
+- exportación Excel de los seis reportes preconfigurados y del detalle de
+  producto;
+- archivos `.xlsx` en memoria, con filtros, orden, formatos, incidencias y
+  advertencias consistentes con la pantalla.
 
-El constructor libre de reportes, exportación, launcher y empaquetado permanecen
-fuera del flujo activo hasta sus etapas correspondientes.
+El constructor libre de reportes, launcher y empaquetado permanecen fuera del
+flujo activo hasta sus etapas correspondientes.
 Algunos archivos del prototipo se conservan congelados como referencia.
 
 ## Requisitos
@@ -157,8 +161,7 @@ enero a diciembre y rellenan meses sin datos con cero.
 
 La capa devuelve dataclasses independientes de HTML y Excel. El dashboard
 consume exclusivamente esta API para sus métricas; no replica fórmulas de
-negocio en las rutas, plantillas ni JavaScript. Costos, utilidad, margen y
-exportación continúan fuera del flujo activo.
+negocio en las rutas, plantillas ni JavaScript.
 
 ## Dashboard
 
@@ -183,6 +186,26 @@ Los históricos semanal y mensual rellenan periodos sin ventas con cero. El
 comparativo incluye siempre las cuatro sucursales activas. Las vistas muestran
 un resumen explícito de filtros, avisan cuando existen incidencias o cargas por
 homologar y nunca incorporan filas crudas sin `SaleRecord` en sus métricas.
+
+## Exportaciones Excel
+
+Los reportes de ventas diarias, semana lunes a domingo, histórico semanal,
+histórico mensual, productos y comparativo de sucursales incluyen el botón
+**Exportar a Excel**. El detalle individual de producto también puede exportarse
+con hojas separadas de resumen, evolución, precios y costos.
+
+`export_service.py` recibe los mismos DTO de `reporting_service.py` utilizados
+por la interfaz. No consulta ventas por una ruta alternativa ni recalcula costo,
+utilidad o margen. El archivo conserva los filtros y el orden elegidos, muestra
+las métricas financieras conocidas y escribe “No disponible” cuando falta un
+costo oficial. Si la cobertura está incompleta, el resumen identifica la
+utilidad como parcial e incluye cobertura por importe y por registros.
+
+Los archivos `.xlsx` se generan en memoria y se entregan directamente como
+descarga; no se guardan ni acumulan en `data/exports/`. Cuando existen incidencias
+del periodo se agrega una hoja comprensible sin IDs, hashes, rutas ni nombres
+internos. Las cargas pendientes se mencionan en el resumen y no se incorporan a
+los resultados.
 
 ## Costos oficiales históricos
 

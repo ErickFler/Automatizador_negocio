@@ -1,5 +1,4 @@
 collect_ignore = [
-    "test_export_service.py",
     "test_sales_processor.py",
     "test_system.py",
 ]

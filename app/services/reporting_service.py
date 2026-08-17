@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.models import (
@@ -12,7 +12,9 @@ from app.db.models import (
     Category,
     ImportBatch,
     MasterProduct,
+    ProcessingIssue,
     ProductCost,
+    RawSaleRecord,
 )
 from app.services.aggregation_service import (
     ALLOWED_METRICS,
@@ -45,12 +47,19 @@ from app.services.profitability_service import (
     ALLOWED_FINANCIAL_SORTS,
     BranchProfitability,
     CategoryProfitability,
+    DailyProfitability,
     FinancialMetrics,
+    PeriodProfitability,
+    ProductBranchProfitability,
     ProductProfitability,
     profitability_by_branch,
     profitability_by_category,
+    profitability_by_product_branch,
     profitability_by_product,
+    profitability_daily,
+    profitability_monthly,
     profitability_totals,
+    profitability_weekly,
 )
 
 ZERO = Decimal(0)
@@ -67,6 +76,7 @@ class ReportContext:
     product_name: str
     period_label: str
     issue_summary: IssuePeriodSummary
+    issues: tuple["ReportIssue", ...]
     pending_batches: int
     warning: str | None = None
 
@@ -78,7 +88,17 @@ class TimeMetricsRow:
     period_start: date
     period_end: date
     metrics: Metrics
+    financial: FinancialMetrics = FinancialMetrics()
     number: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ReportIssue:
+    sales_date: date
+    branch_name: str
+    product_name: str
+    source_row_number: int | None
+    message: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +107,8 @@ class DailyReport:
     sales_date: date
     totals: Metrics
     rows: tuple[ProductBranchAggregate, ...]
+    financial: FinancialMetrics
+    row_financial: dict[tuple[int, int], ProductBranchProfitability]
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +119,11 @@ class WeeklyReport:
     day_rows: tuple[DailyAggregate, ...]
     product_rows: tuple[ProductAggregate, ...]
     sort_links: dict[str, str]
+    sort_by: str
+    direction: str
+    financial: FinancialMetrics
+    day_financial: dict[date, DailyProfitability]
+    product_financial: dict[int, ProductProfitability]
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +132,7 @@ class HistoryReport:
     year: int
     metric: MetricName
     rows: tuple[TimeMetricsRow, ...]
+    financial: FinancialMetrics
 
     @property
     def has_data(self) -> bool:
@@ -171,6 +199,7 @@ class ProductDetailReport:
     prices: tuple[PriceHistoryPoint, ...]
     financial: FinancialMetrics
     official_costs: tuple[ProductCost, ...]
+    daily_financial: dict[date, DailyProfitability]
 
     @property
     def has_cost_changes(self) -> bool:
@@ -189,11 +218,16 @@ def build_daily_report(
     warnings: list[str] = []
     day = _date_value(selected_date, today or date.today(), "fecha", warnings)
     context = _context(session, day, day, branch, category, product, warnings)
+    financial_rows = profitability_by_product_branch(session, context.filters)
     return DailyReport(
         context=context,
         sales_date=day,
         totals=aggregate_totals(session, context.filters),
         rows=tuple(aggregate_by_product_branch(session, context.filters)),
+        financial=profitability_totals(session, context.filters),
+        row_financial={
+            (row.master_product_id, row.branch_id): row for row in financial_rows
+        },
     )
 
 
@@ -216,6 +250,10 @@ def build_weekly_report(
     context = _context(session, start, end, branch, category, product, warnings)
     context = replace(context, period_label=_week_label(start, end))
     existing = {row.sales_date: row for row in aggregate_daily(session, context.filters)}
+    daily_financial = {
+        row.sales_date: row for row in profitability_daily(session, context.filters)
+    }
+    product_financial_rows = profitability_by_product(session, context.filters)
     day_rows = tuple(
         existing.get(current, DailyAggregate(current, Metrics()))
         for current in (start + timedelta(days=offset) for offset in range(7))
@@ -237,6 +275,13 @@ def build_weekly_report(
             sort_by,
             direction,
         ),
+        sort_by=sort_by,
+        direction=direction,
+        financial=profitability_totals(session, context.filters),
+        day_financial=daily_financial,
+        product_financial={
+            row.master_product_id: row for row in product_financial_rows
+        },
     )
 
 
@@ -267,6 +312,9 @@ def build_weekly_history_report(
         )
         for name in ALLOWED_METRICS
     }
+    financial_series = {
+        row.key: row for row in profitability_weekly(session, context.filters)
+    }
     rows = tuple(
         TimeMetricsRow(
             key=point.key,
@@ -280,10 +328,23 @@ def build_weekly_history_report(
                 combo_units=series["combo_units"][index].value,
                 sales_amount=series["sales_amount"][index].value,
             ),
+            financial=financial_series.get(point.key, PeriodProfitability(
+                point.key,
+                point.period_start,
+                point.period_start + timedelta(days=6),
+                Metrics(),
+                FinancialMetrics(),
+            )).financial,
         )
         for index, point in enumerate(series["total_units"])
     )
-    return HistoryReport(context, selected_year, selected_metric, rows)
+    return HistoryReport(
+        context,
+        selected_year,
+        selected_metric,
+        rows,
+        profitability_totals(session, context.filters),
+    )
 
 
 def build_monthly_report(
@@ -307,6 +368,9 @@ def build_monthly_report(
         )
         for name in ALLOWED_METRICS
     }
+    financial_series = {
+        row.key: row for row in profitability_monthly(session, context.filters)
+    }
     rows = tuple(
         TimeMetricsRow(
             key=point.key,
@@ -320,10 +384,23 @@ def build_monthly_report(
                 combo_units=series["combo_units"][index].value,
                 sales_amount=series["sales_amount"][index].value,
             ),
+            financial=financial_series.get(point.key, PeriodProfitability(
+                point.key,
+                point.period_start,
+                _month_end(point.period_start),
+                Metrics(),
+                FinancialMetrics(),
+            )).financial,
         )
         for index, point in enumerate(series["total_units"])
     )
-    return HistoryReport(context, selected_year, selected_metric, rows)
+    return HistoryReport(
+        context,
+        selected_year,
+        selected_metric,
+        rows,
+        profitability_totals(session, context.filters),
+    )
 
 
 def build_products_report(
@@ -461,6 +538,10 @@ def build_product_detail_report(
         ),
         financial=profitability_totals(session, context.filters),
         official_costs=official_costs,
+        daily_financial={
+            row.sales_date: row
+            for row in profitability_daily(session, context.filters)
+        },
     )
 
 
@@ -499,8 +580,61 @@ def _context(
         product_name=_selected_name(products, product_id, "Todos", "display_name"),
         period_label=f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}",
         issue_summary=summarize_issues(session, filters),
+        issues=_report_issues(session, filters),
         pending_batches=_pending_batches(session, filters),
         warning=" ".join(warnings) or None,
+    )
+
+
+def _report_issues(
+    session: Session, filters: AggregationFilters
+) -> tuple[ReportIssue, ...]:
+    statement = (
+        select(
+            ImportBatch.sales_date,
+            Branch.name,
+            RawSaleRecord.original_product_name,
+            ProcessingIssue.source_row_number,
+            ProcessingIssue.message,
+        )
+        .join(ImportBatch, ImportBatch.id == ProcessingIssue.import_batch_id)
+        .join(Branch, Branch.id == ImportBatch.branch_id)
+        .outerjoin(RawSaleRecord, RawSaleRecord.id == ProcessingIssue.raw_sale_record_id)
+    )
+    if filters.master_product_id is not None or filters.category_id is not None:
+        statement = statement.join(
+            BranchProduct,
+            and_(
+                BranchProduct.branch_id == ImportBatch.branch_id,
+                BranchProduct.external_product_id == RawSaleRecord.external_product_id,
+            ),
+        ).join(MasterProduct, MasterProduct.id == BranchProduct.master_product_id)
+    if filters.date_from is not None:
+        statement = statement.where(ImportBatch.sales_date >= filters.date_from)
+    if filters.date_to is not None:
+        statement = statement.where(ImportBatch.sales_date <= filters.date_to)
+    if filters.branch_id is not None:
+        statement = statement.where(ImportBatch.branch_id == filters.branch_id)
+    if filters.master_product_id is not None:
+        statement = statement.where(MasterProduct.id == filters.master_product_id)
+    if filters.category_id is not None:
+        statement = statement.where(MasterProduct.category_id == filters.category_id)
+    return tuple(
+        ReportIssue(
+            sales_date=row.sales_date,
+            branch_name=row.name,
+            product_name=row.original_product_name or "Sin producto identificado",
+            source_row_number=row.source_row_number,
+            message=row.message,
+        )
+        for row in session.execute(
+            statement.order_by(
+                ImportBatch.sales_date,
+                Branch.name,
+                ProcessingIssue.source_row_number,
+                ProcessingIssue.id,
+            )
+        )
     )
 
 

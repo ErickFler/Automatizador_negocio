@@ -4,7 +4,7 @@
   {{ ui.heading("Ventas diarias", "¿Qué ocurrió en un día específico?") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Fecha<input type="date" name="date" value="{{ report.sales_date.isoformat() }}"></label>
-    {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.apply_actions() }}
+    {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.apply_actions('/reports/daily/export') }}
   </form></section>
   {{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}
   {% if report.rows %}<section class="panel report-table"><h2>Detalle por producto y sucursal</h2><div class="table-wrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Sucursal</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th><th>Precio observado</th></tr></thead><tbody>

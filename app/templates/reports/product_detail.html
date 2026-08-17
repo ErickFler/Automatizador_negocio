@@ -3,7 +3,7 @@
 {% block content %}
   {{ ui.heading(report.product.display_name, "Detalle consolidado del producto maestro.") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
-    <label>Fecha inicial<input type="date" name="date_from" value="{{ report.context.filters.date_from.isoformat() }}"></label><label>Fecha final<input type="date" name="date_to" value="{{ report.context.filters.date_to.isoformat() }}"></label>{{ ui.branch_select(report.context) }}{{ ui.apply_actions() }}
+    <label>Fecha inicial<input type="date" name="date_from" value="{{ report.context.filters.date_from.isoformat() }}"></label><label>Fecha final<input type="date" name="date_to" value="{{ report.context.filters.date_to.isoformat() }}"></label>{{ ui.branch_select(report.context) }}{{ ui.apply_actions('/reports/products/' ~ report.product.id ~ '/export') }}
   </form></section>{{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}{{ ui.financial_cards(report.financial) }}
   {% if report.has_cost_changes %}<aside class="dashboard-notice dashboard-notice-warning"><div><strong>El costo oficial cambió dentro de este periodo.</strong><br>Cada venta utiliza el costo vigente en su propia fecha.</div></aside>{% endif %}
   <section class="report-detail-grid">

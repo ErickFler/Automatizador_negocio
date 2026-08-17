@@ -4,7 +4,7 @@
   {{ ui.heading("Comparativo de sucursales", "¿Cómo se comparan Loma Linda, Solidaridad, Alianza y Unidad?") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Fecha inicial<input type="date" name="date_from" value="{{ report.context.filters.date_from.isoformat() }}"></label><label>Fecha final<input type="date" name="date_to" value="{{ report.context.filters.date_to.isoformat() }}"></label>
-    {{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.metric_select(report.metric, metric_labels) }}{{ ui.apply_actions() }}
+    {{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.metric_select(report.metric, metric_labels) }}{{ ui.apply_actions('/reports/branches/export') }}
   </form></section>{{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}{{ ui.financial_cards(report.financial) }}
   <section class="panel chart-panel report-chart"><div class="section-title simple-title"><div><h2>Comparación visual</h2><p>{{ metric_labels[report.metric] }}</p></div></div><div class="canvas-wrap"><canvas id="branch-chart" role="img" aria-label="Comparativo por {{ metric_labels[report.metric] }}"></canvas></div></section>
   {% if not report.has_data %}{{ ui.empty() }}{% endif %}

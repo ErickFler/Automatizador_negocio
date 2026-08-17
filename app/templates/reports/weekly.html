@@ -4,7 +4,7 @@
   {{ ui.heading("Semana lunes a domingo", "¿Cómo se comportó la semana día por día?") }}
   <section class="panel report-filters"><form method="get" class="filter-grid">
     <label>Una fecha dentro de la semana<input type="date" name="date" value="{{ report.anchor_date.isoformat() }}"></label>
-    {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}{{ ui.apply_actions() }}
+    {{ ui.branch_select(report.context) }}{{ ui.category_select(report.context) }}{{ ui.product_select(report.context) }}<input type="hidden" name="sort" value="{{ report.sort_by }}"><input type="hidden" name="direction" value="{{ report.direction }}">{{ ui.apply_actions('/reports/weekly/export') }}
   </form></section>
   {{ ui.summary(report.context) }}{{ ui.cards(report.totals) }}
   <section class="panel report-table"><h2>Semana completa</h2><div class="table-wrap"><table><thead><tr><th>Día</th><th>Fecha</th><th class="number-cell">Unidades totales</th><th class="number-cell">Venta individual</th><th class="number-cell">Combo</th><th class="number-cell">Venta $</th></tr></thead><tbody>

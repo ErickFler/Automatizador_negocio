@@ -55,6 +55,18 @@ class ProductProfitability:
 
 
 @dataclass(frozen=True, slots=True)
+class ProductBranchProfitability:
+    master_product_id: int
+    product_name: str
+    category_id: int
+    category_name: str
+    branch_id: int
+    branch_name: str
+    sales_metrics: Metrics
+    financial: FinancialMetrics
+
+
+@dataclass(frozen=True, slots=True)
 class BranchProfitability:
     branch_id: int
     branch_name: str
@@ -166,6 +178,32 @@ def profitability_by_branch(
         )
         for branch in session.scalars(statement)
     ]
+
+
+def profitability_by_product_branch(
+    session: Session, filters: AggregationFilters | None = None
+) -> list[ProductBranchProfitability]:
+    grouped: dict[tuple[int, int], list[_ResolvedFact]] = {}
+    for row in _resolved_facts(session, filters or AggregationFilters()):
+        grouped.setdefault(
+            (row.fact.master_product_id, row.fact.branch_id), []
+        ).append(row)
+    return sorted(
+        (
+            ProductBranchProfitability(
+                master_product_id=product_id,
+                product_name=rows[0].fact.product_name,
+                category_id=rows[0].fact.category_id,
+                category_name=rows[0].fact.category_name,
+                branch_id=branch_id,
+                branch_name=rows[0].fact.branch_name,
+                sales_metrics=_sales_metrics(rows),
+                financial=_financial_metrics(rows),
+            )
+            for (product_id, branch_id), rows in grouped.items()
+        ),
+        key=lambda row: (row.product_name.casefold(), row.branch_name.casefold()),
+    )
 
 
 def profitability_by_category(

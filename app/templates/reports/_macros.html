@@ -33,8 +33,8 @@
   </select></label>
 {% endmacro %}
 
-{% macro apply_actions() %}
-  <div class="filter-actions"><button class="button button-primary" type="submit">Consultar reporte</button></div>
+{% macro apply_actions(export_path="") %}
+  <div class="filter-actions"><button class="button button-primary" type="submit">Consultar reporte</button>{% if export_path %}<button class="button button-secondary" type="submit" formaction="{{ export_path }}">Exportar a Excel</button>{% endif %}</div>
 {% endmacro %}
 
 {% macro summary(context) %}
