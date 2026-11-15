@@ -128,6 +128,11 @@ def run_launcher(*, open_browser: bool = True) -> int:
         host=LOOPBACK_HOST,
         port=settings.port,
         log_level=settings.log_level.lower(),
+        # The Windows executable is built in ``windowed`` mode, where
+        # sys.stderr is None. Uvicorn's default dictConfig formatter probes
+        # that stream with isatty(), so keep the file-based app logging above
+        # and let Uvicorn use the existing logging configuration.
+        log_config=None,
     )
     server = uvicorn.Server(config)
     application.state.shutdown_callback = lambda: setattr(server, "should_exit", True)
