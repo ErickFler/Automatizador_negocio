@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado semanal · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">Resultado semanal</p>
+      <h1>Semana recibida</h1>
+      <p class="hero-copy">Del {{ week_start.strftime('%d/%m/%Y') }} al {{ week_end.strftime('%d/%m/%Y') }}</p>
+    </div>
+    <a class="button button-secondary" href="/imports/new">Nueva carga</a>
+  </section>
+
+  <section class="weekly-result-cards" aria-label="Resumen de la carga">
+    <article><span>Archivos recibidos</span><strong>{{ received_count }}</strong></article>
+    <article><span>Necesitan confirmación</span><strong>{{ pending_count }}</strong></article>
+    <article><span>No procesados</span><strong>{{ problem_count }}</strong></article>
+  </section>
+
+  {% if pending_count %}
+    <div class="alert alert-warning" role="status">Hay archivos con productos nuevos. Puede revisar únicamente esos casos.</div>
+  {% endif %}
+
+  <section class="panel weekly-result-panel">
+    <div class="section-title">
+      <div>
+        <h2>Resultado por día y sucursal</h2>
+        <p>Los archivos válidos se procesaron aunque otro archivo necesitara revisión.</p>
+      </div>
+    </div>
+    <div class="weekly-result-days">
+      {% for day in outcome_days %}
+        <details class="history-day" {{ 'open' if loop.first or day.problem_count else '' }}>
+          <summary>
+            <strong>{{ day.sales_date.strftime('%d/%m/%Y') if day.sales_date else 'Archivos sin identificar' }}</strong>
+            <span>{{ day.successful_count }} listos{% if day.problem_count %} · {{ day.problem_count }} para revisar{% endif %}</span>
+          </summary>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Sucursal</th><th>Estado</th><th>Resultado</th><th>Acción</th></tr></thead>
+              <tbody>
+                {% for outcome in day.outcomes %}
+                  <tr>
+                    <td><strong>{{ outcome.branch }}</strong><br><small>{{ outcome.filename }}</small></td>
+                    <td><span class="badge {{ 'badge-success' if outcome.successful and not outcome.mapping_required else 'badge-warning' if outcome.mapping_required else 'badge-error' }}">{{ outcome.status_label }}</span></td>
+                    <td>{{ outcome.message }}</td>
+                    <td>
+                      {% if outcome.mapping_required %}
+                        <a class="button button-primary button-small" href="/imports/{{ outcome.batch_id }}/products">Revisar productos</a>
+                      {% elif outcome.batch_id %}
+                        <a class="button button-secondary button-small" href="/imports/{{ outcome.batch_id }}">Ver detalle</a>
+                      {% else %}—{% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="bottom-actions"><a class="button button-secondary" href="/imports">Ver historial</a></div>
+{% endblock %}

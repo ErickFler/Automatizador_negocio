@@ -2,16 +2,19 @@ from datetime import date
 from decimal import Decimal
 
 
-def format_decimal(value: Decimal | None) -> str:
-    if value is None:
-        return "0"
-    if value == value.to_integral_value():
-        return f"{value:,.0f}"
-    return f"{value:,.4f}".rstrip("0").rstrip(".")
+DisplayNumber = Decimal | int | float | str | None
 
 
-def format_money(value: Decimal | None) -> str:
-    return f"${(value or Decimal(0)):,.2f}"
+def _display_decimal(value: DisplayNumber) -> Decimal:
+    return Decimal(0) if value is None else Decimal(str(value))
+
+
+def format_decimal(value: DisplayNumber) -> str:
+    return f"{_display_decimal(value):,.0f}"
+
+
+def format_money(value: DisplayNumber) -> str:
+    return f"${_display_decimal(value):,.2f}"
 
 
 def format_percent(value: Decimal | None) -> str:

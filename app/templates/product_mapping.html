@@ -18,6 +18,19 @@
     {% if saved %}<div class="alert alert-success" role="status">Producto confirmado y guardado correctamente.</div>{% endif %}
     {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
 
+    {% if exact_matches %}
+      <section class="panel exact-match-panel">
+        <div>
+          <p class="eyebrow">Coincidencias seguras</p>
+          <h2>{{ exact_matches|length }} productos tienen el mismo nombre y categoría</h2>
+          <p>Puede confirmarlos juntos. Después solo quedarán los casos que realmente necesitan revisión.</p>
+        </div>
+        <form action="/imports/{{ batch.id }}/products/map-exact" method="post">
+          <button class="button button-primary" type="submit">Confirmar coincidencias exactas</button>
+        </form>
+      </section>
+    {% endif %}
+
     {% if current %}
       <section class="panel">
         <div class="form-heading">

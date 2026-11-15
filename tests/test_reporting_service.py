@@ -344,6 +344,22 @@ def test_products_group_by_master_and_sort_name_and_numeric(reporting_session) -
     assert salad.metrics == Metrics(Decimal("15"), Decimal("6"), Decimal("9"), Decimal("294"))
 
 
+def test_products_support_alphabetical_category_sort_and_header_links(
+    reporting_session,
+) -> None:
+    session, _ = reporting_session
+    common = dict(date_from="2026-08-01", date_to="2026-08-31", today=REFERENCE_DAY)
+
+    report = build_products_report(
+        session, sort_by="category", direction="asc", **common
+    )
+
+    categories = [row.category_name.casefold() for row in report.rows]
+    assert categories == sorted(categories)
+    assert "sort=category" in report.sort_links["category"]
+    assert "direction=desc" in report.sort_links["category"]
+
+
 def test_products_category_and_branch_filters(reporting_session) -> None:
     session, context = reporting_session
     report = build_products_report(
@@ -441,6 +457,31 @@ def test_daily_html_has_summary_alerts_and_no_local_ids(reporting_client) -> Non
     assert "Este periodo contiene registros con incidencias" in response.text
     assert "Hay cargas pendientes de confirmar" in response.text
     assert "LOCAL 248" not in response.text and "LOCAL 254" not in response.text
+
+
+def test_products_html_uses_clear_order_labels_and_clickable_sort_arrows(
+    reporting_client,
+) -> None:
+    client, _, _ = reporting_client
+
+    numeric = client.get(
+        "/reports/products?date_from=2026-08-01&date_to=2026-08-31"
+        "&sort=sales_amount&direction=desc"
+    )
+    alphabetical = client.get(
+        "/reports/products?date_from=2026-08-01&date_to=2026-08-31"
+        "&sort=name&direction=asc"
+    )
+
+    assert numeric.status_code == alphabetical.status_code == 200
+    assert "Dirección" not in numeric.text
+    assert "Mayor a menor" in numeric.text
+    assert 'aria-sort="descending"' in numeric.text
+    assert "Presione el nombre de una columna para ordenar" in numeric.text
+    assert "A–Z" in alphabetical.text
+    assert 'aria-sort="ascending"' in alphabetical.text
+    assert "sort=known_profit" in numeric.text
+    assert "sort=category" in numeric.text
 
 
 def test_empty_period_has_clear_state(reporting_client) -> None:

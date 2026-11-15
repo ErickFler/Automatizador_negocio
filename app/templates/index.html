@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% import "reports/_macros.html" as ui %}
 
 {% block title %}Control y análisis de ventas{% endblock %}
 
@@ -95,8 +95,8 @@
 
   {% if dashboard.issue_summary.raw_rows_with_issues %}
     <aside class="dashboard-notice" role="status">
-      <div><strong>Hay registros con incidencias en este periodo.</strong><br>{{ dashboard.issue_summary.raw_rows_with_issues }} registros requieren revisión.</div>
-      <a href="/imports">Ver incidencias</a>
+      <div><strong>Hay datos para revisar (incidencias).</strong><br>{{ dashboard.issue_summary.raw_rows_with_issues }} registros no pudieron incluirse normalmente.</div>
+      <a href="/imports">Ver detalles</a>
     </aside>
   {% endif %}
   {% if dashboard.pending_batches %}
@@ -119,7 +119,7 @@
         <div class="canvas-wrap"><canvas id="temporal-chart" role="img" aria-label="Evolución de {{ dashboard.temporal_chart.metric_label }}"></canvas></div>
         <details class="chart-values"><summary>Ver valores de la gráfica</summary>
           <table><thead><tr><th>Periodo</th><th>Valor</th></tr></thead><tbody>
-            {% for label in dashboard.temporal_chart.labels %}<tr><td>{{ label }}</td><td class="number-cell">{{ dashboard.temporal_chart.values[loop.index0] }}</td></tr>{% endfor %}
+            {% for label in dashboard.temporal_chart.labels %}<tr><td>{{ label }}</td><td class="number-cell">{{ dashboard.temporal_chart.values[loop.index0]|money if dashboard.selection.metric == 'sales_amount' else dashboard.temporal_chart.values[loop.index0]|decimal }}</td></tr>{% endfor %}
           </tbody></table>
         </details>
       </article>
@@ -128,7 +128,7 @@
         <div class="canvas-wrap"><canvas id="branch-chart" role="img" aria-label="Comparativo de sucursales por {{ dashboard.branch_chart.metric_label }}"></canvas></div>
         <details class="chart-values"><summary>Ver valores de la gráfica</summary>
           <table><thead><tr><th>Sucursal</th><th>Valor</th></tr></thead><tbody>
-            {% for label in dashboard.branch_chart.labels %}<tr><td>{{ label }}</td><td class="number-cell">{{ dashboard.branch_chart.values[loop.index0] }}</td></tr>{% endfor %}
+            {% for label in dashboard.branch_chart.labels %}<tr><td>{{ label }}</td><td class="number-cell">{{ dashboard.branch_chart.values[loop.index0]|money if dashboard.selection.metric == 'sales_amount' else dashboard.branch_chart.values[loop.index0]|decimal }}</td></tr>{% endfor %}
           </tbody></table>
         </details>
       </article>
@@ -139,12 +139,12 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th><a href="{{ dashboard.sort_links.name }}">Producto</a></th>
-            <th>Categoría</th>
-            <th class="number-cell"><a href="{{ dashboard.sort_links.total_units }}">Unidades totales</a></th>
-            <th class="number-cell"><a href="{{ dashboard.sort_links.individual_sale_units }}">Venta individual</a></th>
-            <th class="number-cell"><a href="{{ dashboard.sort_links.combo_units }}">Combo</a></th>
-            <th class="number-cell"><a href="{{ dashboard.sort_links.sales_amount }}">Venta $</a></th>
+            {{ ui.sortable_header(dashboard.sort_links, dashboard.selection.sort_by, dashboard.selection.direction, 'name', 'Producto') }}
+            {{ ui.sortable_header(dashboard.sort_links, dashboard.selection.sort_by, dashboard.selection.direction, 'category', 'Categoría') }}
+            {{ ui.sortable_header(dashboard.sort_links, dashboard.selection.sort_by, dashboard.selection.direction, 'total_units', 'Unidades totales', true) }}
+            {{ ui.sortable_header(dashboard.sort_links, dashboard.selection.sort_by, dashboard.selection.direction, 'individual_sale_units', 'Venta individual', true) }}
+            {{ ui.sortable_header(dashboard.sort_links, dashboard.selection.sort_by, dashboard.selection.direction, 'combo_units', 'Combo', true) }}
+            {{ ui.sortable_header(dashboard.sort_links, dashboard.selection.sort_by, dashboard.selection.direction, 'sales_amount', 'Venta $', true) }}
           </tr></thead>
           <tbody>
             {% for row in dashboard.product_rows %}
@@ -165,4 +165,4 @@
   <script id="dashboard-chart-data" type="application/json">{{ dashboard.chart_json|tojson }}</script>
 {% endblock %}
 
-{% block scripts %}<script src="{{ url_for('static', path='/js/dashboard.js') }}" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/js/dashboard.js') }}?v={{ asset_version('js/dashboard.js') }}" defer></script>{% endblock %}

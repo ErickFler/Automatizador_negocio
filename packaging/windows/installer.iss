@@ -1,13 +1,14 @@
 #define MyAppName "Concentrado de Ventas"
-#define MyAppVersion "0.1.0"
-#define MyAppPublisher "Concentrado de Ventas"
 #define MyAppExeName "ConcentradoVentas.exe"
+
+#ifndef MyAppVersion
+  #error MyAppVersion debe recibirse desde build-installer.ps1
+#endif
 
 [Setup]
 AppId={{B91FEE86-E2AF-4FB4-B117-F88272289E2A}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\ConcentradoVentas
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -21,6 +22,9 @@ WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0
+CloseApplications=yes
+RestartApplications=no
 
 [Files]
 Source: "..\..\dist\ConcentradoVentas\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

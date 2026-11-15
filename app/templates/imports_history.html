@@ -4,35 +4,49 @@
 
 {% block content %}
   <section class="hero compact">
-    <div><p class="eyebrow">Consulta local</p><h1>Historial de cargas</h1></div>
+    <div>
+      <p class="eyebrow">Consulta local</p>
+      <h1>Historial de cargas</h1>
+      <p class="hero-copy">Los archivos están agrupados por día para facilitar su revisión.</p>
+    </div>
     <a class="button button-primary" href="/imports/new">Nueva carga</a>
   </section>
 
-  <section class="panel">
-    {% if batches %}
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Fecha de ventas</th><th>Sucursal</th><th>Archivo</th><th>Estado</th><th>Filas</th></tr></thead>
-          <tbody>
-            {% for batch in batches %}
-              <tr>
-                <td>{{ batch.sales_date.strftime('%d/%m/%Y') }}</td>
-                <td>{{ batch.branch.name }}</td>
-                <td><a href="/imports/{{ batch.id }}">{{ batch.source_filename }}</a></td>
-                <td>
-                  {{ status_labels[batch.status] }}
-                  {% if batch.status == 'WAITING_FOR_PRODUCT_MAPPING' %}
-                    · <a href="/imports/{{ batch.id }}/products">Continuar</a>
-                  {% endif %}
-                </td>
-                <td>{{ batch.normalized_rows }} / {{ batch.total_rows }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="empty-state"><h2>Aún no hay cargas</h2><p>Procesa el primer reporte para comenzar.</p></div>
-    {% endif %}
-  </section>
+  {% if history_days %}
+    {% for day in history_days %}
+      <details class="panel history-day" {% if loop.first %}open{% endif %}>
+        <summary>
+          <strong>{{ day.sales_date.strftime('%d/%m/%Y') }}</strong>
+          <span>
+            {{ day.ready_count }} {{ 'sucursal lista' if day.ready_count == 1 else 'sucursales listas' }}
+            {% if day.attention_count %} · {{ day.attention_count }} por revisar{% endif %}
+          </span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Sucursal</th><th>Archivo</th><th>Estado</th><th>Filas incluidas</th><th>Acción</th></tr></thead>
+            <tbody>
+              {% for batch in day.batches %}
+                <tr>
+                  <td><strong>{{ batch.branch.name }}</strong></td>
+                  <td>{{ batch.source_filename }}</td>
+                  <td>{{ status_labels[batch.status] }}</td>
+                  <td>{{ batch.normalized_rows }} de {{ batch.total_rows }}</td>
+                  <td>
+                    {% if batch.status == 'WAITING_FOR_PRODUCT_MAPPING' %}
+                      <a class="button button-primary button-small" href="/imports/{{ batch.id }}/products">Revisar productos</a>
+                    {% else %}
+                      <a class="button button-secondary button-small" href="/imports/{{ batch.id }}">Ver detalle</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    {% endfor %}
+  {% else %}
+    <section class="panel empty-state"><h2>Aún no hay cargas</h2><p>Procese el primer reporte para comenzar.</p></section>
+  {% endif %}
 {% endblock %}

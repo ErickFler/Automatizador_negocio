@@ -368,11 +368,10 @@ def _date_range(start: date, end: date) -> tuple[date, ...]:
 def _sort_links(selection: DashboardSelection) -> dict[str, str]:
     result: dict[str, str] = {}
     for field in ALLOWED_PRODUCT_SORTS:
-        next_direction = (
-            "asc"
-            if selection.sort_by != field or selection.direction == "desc"
-            else "desc"
-        )
+        if selection.sort_by == field:
+            next_direction = "asc" if selection.direction == "desc" else "desc"
+        else:
+            next_direction = "asc" if field in {"name", "category"} else "desc"
         params = {
             "period": selection.period,
             "date_from": selection.date_from.isoformat(),

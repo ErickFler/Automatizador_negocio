@@ -23,7 +23,9 @@ from app.services.product_catalog import (
 )
 from app.services.product_mapping import (
     create_and_map_product,
+    list_exact_mapping_candidates,
     list_pending_products,
+    map_exact_product_matches,
     map_to_existing_product,
 )
 from app.services.raw_import_service import (
@@ -222,6 +224,49 @@ def test_partial_progress_persists_until_all_products_are_resolved(
             master_product_id=second_master.id,
         )
         assert resumed_session.get(ImportBatch, batch.id).status == "COMPLETED"
+
+
+def test_exact_matches_are_confirmed_together_and_reprocess_waiting_days(
+    session: Session,
+) -> None:
+    _master(session, name="Producto Uno", category_name="Bebidas")
+    first = _batch(
+        session,
+        products=[("1", "PRODUCTO UNO", "BEBIDAS")],
+        number=1,
+    )
+    second = _batch(
+        session,
+        products=[("1", "PRODUCTO UNO", "BEBIDAS")],
+        number=2,
+    )
+
+    exact = list_exact_mapping_candidates(session, batch_id=first.id)
+    result = map_exact_product_matches(session, batch_id=first.id)
+
+    assert len(exact) == 1
+    assert result.mapped_count == 1
+    assert set(result.processed_batch_ids) == {first.id, second.id}
+    assert session.get(ImportBatch, first.id).status == "COMPLETED"
+    assert session.get(ImportBatch, second.id).status == "COMPLETED"
+
+
+def test_zero_price_product_does_not_require_catalog_mapping(
+    session: Session,
+) -> None:
+    batch = _batch(
+        session,
+        products=[("359", "MEDIO POLLO ASADO", "PREPARACION")],
+    )
+    raw = session.scalar(
+        select(RawSaleRecord).where(RawSaleRecord.import_batch_id == batch.id)
+    )
+    assert raw is not None
+    raw.sale_price_raw = "0"
+    raw.total_amount_raw = "0"
+    session.commit()
+
+    assert list_pending_products(session, batch_id=batch.id) == []
 
 
 def test_two_branches_can_map_different_local_ids_to_same_master(

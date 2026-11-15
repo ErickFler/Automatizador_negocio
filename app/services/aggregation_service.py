@@ -23,7 +23,7 @@ MetricName = Literal[
 ]
 SortDirection = Literal["asc", "desc"]
 ProductSort = Literal[
-    "name", "total_units", "individual_sale_units", "combo_units", "sales_amount"
+    "name", "category", "total_units", "individual_sale_units", "combo_units", "sales_amount"
 ]
 
 ALLOWED_METRICS: tuple[MetricName, ...] = (
@@ -34,6 +34,7 @@ ALLOWED_METRICS: tuple[MetricName, ...] = (
 )
 ALLOWED_PRODUCT_SORTS: tuple[ProductSort, ...] = (
     "name",
+    "category",
     *ALLOWED_METRICS,
 )
 ZERO = Decimal(0)
@@ -340,6 +341,11 @@ def aggregate_by_product(
     if sort_by == "name":
         if direction == "desc":
             rows.reverse()
+    elif sort_by == "category":
+        rows.sort(
+            key=lambda row: (row.category_name.casefold(), row.product_name.casefold()),
+            reverse=direction == "desc",
+        )
     else:
         rows.sort(
             key=lambda row: metric_value(row.metrics, sort_by),

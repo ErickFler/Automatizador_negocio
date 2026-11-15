@@ -10,6 +10,7 @@ from app.db.models import (
     ProcessingIssue,
     RawSaleRecord,
 )
+from app.domain.import_policy import requires_product_mapping
 from app.domain.normalization import normalize_for_comparison
 from app.services.product_catalog import (
     create_branch_product,
@@ -22,6 +23,7 @@ from app.services.raw_import_service import (
     WAITING_FOR_PRODUCT_MAPPING,
     WARNING,
 )
+from app.services.numeric_parser import parse_decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +32,18 @@ class PendingLocalProduct:
     original_product_name: str
     original_category_name: str | None
     row_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ExactMappingCandidate:
+    pending_product: PendingLocalProduct
+    master_product: MasterProduct
+
+
+@dataclass(frozen=True, slots=True)
+class BulkMappingResult:
+    mapped_count: int
+    processed_batch_ids: tuple[int, ...]
 
 
 def list_pending_products(
@@ -58,7 +72,14 @@ def list_pending_products(
     grouped: dict[str, PendingLocalProduct] = {}
     for row in rows:
         external_id = (row.external_product_id or "").strip()
-        if not external_id or external_id in known_external_ids:
+        sale_price = parse_decimal(row.sale_price_raw)
+        if (
+            not external_id
+            or external_id in known_external_ids
+            or not requires_product_mapping(
+                sale_price.value if sale_price.is_valid else None
+            )
+        ):
             continue
         existing = grouped.get(external_id)
         if existing is None:
@@ -76,6 +97,71 @@ def list_pending_products(
                 row_count=existing.row_count + 1,
             )
     return list(grouped.values())
+
+
+def list_exact_mapping_candidates(
+    session: Session, *, batch_id: int
+) -> list[ExactMappingCandidate]:
+    """Return unambiguous same-name, same-category catalog matches."""
+    products = session.scalars(
+        select(MasterProduct)
+        .options(joinedload(MasterProduct.category))
+        .where(MasterProduct.active.is_(True))
+    ).all()
+    products_by_key = {
+        (product.normalized_name, product.category.normalized_name): product
+        for product in products
+    }
+    exact: list[ExactMappingCandidate] = []
+    for pending in list_pending_products(session, batch_id=batch_id):
+        key = (
+            normalize_for_comparison(pending.original_product_name),
+            normalize_for_comparison(pending.original_category_name or ""),
+        )
+        product = products_by_key.get(key)
+        if product is not None:
+            exact.append(
+                ExactMappingCandidate(
+                    pending_product=pending,
+                    master_product=product,
+                )
+            )
+    return exact
+
+
+def map_exact_product_matches(
+    session: Session, *, batch_id: int
+) -> BulkMappingResult:
+    batch = session.scalar(
+        select(ImportBatch)
+        .options(joinedload(ImportBatch.branch))
+        .where(ImportBatch.id == batch_id)
+    )
+    if batch is None:
+        raise ValueError("La carga solicitada no existe.")
+    exact = list_exact_mapping_candidates(session, batch_id=batch_id)
+    try:
+        for candidate in exact:
+            pending = candidate.pending_product
+            create_branch_product(
+                session,
+                branch=batch.branch,
+                external_product_id=pending.external_product_id,
+                original_product_name=pending.original_product_name,
+                original_category_name=pending.original_category_name,
+                master_product=candidate.master_product,
+            )
+        session.commit()
+        processed = process_ready_batches_for_branch(
+            session, branch_id=batch.branch_id
+        )
+        return BulkMappingResult(
+            mapped_count=len(exact),
+            processed_batch_ids=tuple(processed),
+        )
+    except Exception:
+        session.rollback()
+        raise
 
 
 def map_to_existing_product(
@@ -107,11 +193,8 @@ def map_to_existing_product(
             raw_record=representative,
             master_product=master_product,
         )
-        refresh_batch_mapping_status(
-            session, batch_id=batch.id, commit=False
-        )
         session.commit()
-        _process_if_mapping_complete(session, batch.id)
+        process_ready_batches_for_branch(session, branch_id=batch.branch_id)
         return branch_product
     except Exception:
         session.rollback()
@@ -146,11 +229,8 @@ def create_and_map_product(
             original_category_name=representative.original_category_name,
             master_product=master_product,
         )
-        refresh_batch_mapping_status(
-            session, batch_id=batch.id, commit=False
-        )
         session.commit()
-        _process_if_mapping_complete(session, batch.id)
+        process_ready_batches_for_branch(session, branch_id=batch.branch_id)
         return branch_product
     except Exception:
         session.rollback()
@@ -238,11 +318,24 @@ def _record_category_mismatch(
     )
 
 
-def _process_if_mapping_complete(session: Session, batch_id: int) -> None:
-    if list_pending_products(session, batch_id=batch_id):
-        return
-    # Importación y normalización siguen siendo servicios reejecutables separados;
-    # este punto solo orquesta el flujo sencillo al confirmar el último producto.
+def process_ready_batches_for_branch(
+    session: Session, *, branch_id: int
+) -> list[int]:
+    """Reprocess every waiting batch made ready by a branch-level mapping."""
     from app.services.sales_processing_service import process_normalized_sales_batch
 
-    process_normalized_sales_batch(session, batch_id=batch_id)
+    waiting_ids = session.scalars(
+        select(ImportBatch.id)
+        .where(
+            ImportBatch.branch_id == branch_id,
+            ImportBatch.status == WAITING_FOR_PRODUCT_MAPPING,
+        )
+        .order_by(ImportBatch.sales_date, ImportBatch.id)
+    ).all()
+    processed_ids: list[int] = []
+    for waiting_id in waiting_ids:
+        if list_pending_products(session, batch_id=waiting_id):
+            continue
+        process_normalized_sales_batch(session, batch_id=waiting_id)
+        processed_ids.append(waiting_id)
+    return processed_ids

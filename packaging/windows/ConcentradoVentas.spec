@@ -3,16 +3,15 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 project_root = Path(SPECPATH).parents[1]
+version_file = project_root / "build" / "windows" / "version_info.txt"
+if not version_file.is_file():
+    raise SystemExit(
+        "Falta build/windows/version_info.txt. Ejecuta packaging/windows/build.ps1."
+    )
 hidden_imports = (
     collect_submodules("openpyxl")
     + collect_submodules("sqlalchemy.dialects.sqlite")
-    + [
-        "uvicorn.logging",
-        "uvicorn.loops.auto",
-        "uvicorn.protocols.http.auto",
-        "uvicorn.protocols.websockets.auto",
-        "uvicorn.lifespan.on",
-    ]
+    + collect_submodules("uvicorn")
 )
 
 analysis = Analysis(
@@ -43,7 +42,7 @@ executable = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -51,7 +50,7 @@ executable = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=str(project_root / "assets" / "app.ico"),
-    version=str(project_root / "packaging" / "windows" / "version_info.txt"),
+    version=str(version_file),
 )
 
 distribution = COLLECT(
@@ -59,7 +58,7 @@ distribution = COLLECT(
     analysis.binaries,
     analysis.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="ConcentradoVentas",
 )

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado de la carga · Concentrado de Ventas{% endblock %}
+
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">Resultado · {{ sales_date.strftime('%d/%m/%Y') }}</p>
+      <h1>Carga de sucursales</h1>
+      <p class="hero-copy">{{ successful_count }} de {{ outcomes|length }} archivos fueron recibidos.</p>
+    </div>
+    <a class="button button-secondary" href="/imports/new">Nueva carga</a>
+  </section>
+
+  {% if pending_count %}
+    <div class="alert alert-warning" role="status">
+      {{ pending_count }} {{ 'archivo necesita' if pending_count == 1 else 'archivos necesitan' }} confirmar productos nuevos.
+    </div>
+  {% endif %}
+
+  <section class="panel">
+    <div class="section-title">
+      <div>
+        <h2>Archivos recibidos</h2>
+        <p>Cada sucursal se conserva como un lote independiente para mantener la trazabilidad.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Sucursal</th><th>Archivo</th><th>Estado</th><th>Detalle</th><th>Acción</th></tr></thead>
+        <tbody>
+          {% for outcome in outcomes %}
+            <tr>
+              <td><strong>{{ outcome.branch }}</strong></td>
+              <td>{{ outcome.filename }}</td>
+              <td><span class="badge {{ 'badge-warning' if outcome.mapping_required else 'badge-success' if outcome.successful else 'badge-error' }}">{{ outcome.status_label }}</span></td>
+              <td>{{ outcome.message }}</td>
+              <td>
+                {% if outcome.mapping_required %}
+                  <a class="button button-primary button-small" href="/imports/{{ outcome.batch_id }}/products">Revisar productos</a>
+                {% elif outcome.batch_id %}
+                  <a class="button button-secondary button-small" href="/imports/{{ outcome.batch_id }}">Ver detalle</a>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="bottom-actions">
+    <a class="button button-secondary" href="/imports">Ver historial</a>
+  </div>
+{% endblock %}

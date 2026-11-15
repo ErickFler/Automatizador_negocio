@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import multiprocessing
 import os
 from pathlib import Path
 import secrets
@@ -181,4 +182,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     raise SystemExit(main())

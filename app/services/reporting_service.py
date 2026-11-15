@@ -63,6 +63,20 @@ from app.services.profitability_service import (
 )
 
 ZERO = Decimal(0)
+FINANCIAL_TABLE_FIELDS = (*ALLOWED_FINANCIAL_SORTS,)
+DAILY_SORT_FIELDS = (
+    "name",
+    "category",
+    "branch",
+    *ALLOWED_METRICS,
+    "observed_price",
+    *FINANCIAL_TABLE_FIELDS,
+)
+WEEKLY_DAY_SORT_FIELDS = ("date", *ALLOWED_METRICS, *FINANCIAL_TABLE_FIELDS)
+HISTORY_SORT_FIELDS = ("period", *ALLOWED_METRICS, *FINANCIAL_TABLE_FIELDS)
+BRANCH_SORT_FIELDS = ("branch", *ALLOWED_METRICS, *FINANCIAL_TABLE_FIELDS)
+BRANCH_ALLOWED_SORT_FIELDS = ("position", *BRANCH_SORT_FIELDS)
+CATEGORY_SORT_FIELDS = ("category", "sales_amount", *FINANCIAL_TABLE_FIELDS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +123,9 @@ class DailyReport:
     rows: tuple[ProductBranchAggregate, ...]
     financial: FinancialMetrics
     row_financial: dict[tuple[int, int], ProductBranchProfitability]
+    sort_links: dict[str, str]
+    sort_by: str
+    direction: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +141,9 @@ class WeeklyReport:
     financial: FinancialMetrics
     day_financial: dict[date, DailyProfitability]
     product_financial: dict[int, ProductProfitability]
+    day_sort_links: dict[str, str]
+    day_sort_by: str
+    day_direction: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +153,9 @@ class HistoryReport:
     metric: MetricName
     rows: tuple[TimeMetricsRow, ...]
     financial: FinancialMetrics
+    sort_links: dict[str, str]
+    sort_by: str
+    direction: str
 
     @property
     def has_data(self) -> bool:
@@ -140,10 +163,14 @@ class HistoryReport:
 
     @property
     def chart_json(self) -> dict[str, object]:
+        chronological_rows = tuple(sorted(self.rows, key=lambda row: row.period_start))
         return {
             "temporal": {
-                "labels": tuple(row.label for row in self.rows),
-                "values": tuple(str(metric_value(row.metrics, self.metric)) for row in self.rows),
+                "labels": tuple(row.label for row in chronological_rows),
+                "values": tuple(
+                    str(metric_value(row.metrics, self.metric))
+                    for row in chronological_rows
+                ),
                 "metric_label": METRIC_LABELS[self.metric],
             },
             "branches": {"labels": (), "values": (), "metric_label": ""},
@@ -158,9 +185,13 @@ class ProductsReport:
     rows: tuple[ProductAggregate, ...]
     sort_by: str
     direction: str
+    sort_links: dict[str, str]
     financial: FinancialMetrics
     product_financial: dict[int, ProductProfitability]
     category_financial: tuple[CategoryProfitability, ...]
+    category_sort_links: dict[str, str]
+    category_sort_by: str
+    category_direction: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +202,9 @@ class BranchesReport:
     rows: tuple[BranchAggregate, ...]
     financial: FinancialMetrics
     branch_financial: dict[int, BranchProfitability]
+    sort_links: dict[str, str]
+    sort_by: str
+    direction: str
 
     @property
     def has_data(self) -> bool:
@@ -213,21 +247,46 @@ def build_daily_report(
     branch: str = "",
     category: str = "",
     product: str = "",
+    sort_by: str = "name",
+    direction: str = "asc",
     today: date | None = None,
 ) -> DailyReport:
     warnings: list[str] = []
     day = _date_value(selected_date, today or date.today(), "fecha", warnings)
     context = _context(session, day, day, branch, category, product, warnings)
+    sort_by, direction = _safe_table_sort(
+        sort_by, direction, DAILY_SORT_FIELDS, "name", "asc", warnings
+    )
     financial_rows = profitability_by_product_branch(session, context.filters)
+    row_financial = {
+        (row.master_product_id, row.branch_id): row for row in financial_rows
+    }
+    rows = tuple(
+        sorted(
+            aggregate_by_product_branch(session, context.filters),
+            key=lambda row: _product_branch_sort_value(row, row_financial, sort_by),
+            reverse=direction == "desc",
+        )
+    )
     return DailyReport(
         context=context,
         sales_date=day,
         totals=aggregate_totals(session, context.filters),
-        rows=tuple(aggregate_by_product_branch(session, context.filters)),
+        rows=rows,
         financial=profitability_totals(session, context.filters),
-        row_financial={
-            (row.master_product_id, row.branch_id): row for row in financial_rows
-        },
+        row_financial=row_financial,
+        sort_links=_table_sort_links(
+            "/reports/daily",
+            context,
+            {"date": day.isoformat()},
+            sort_by,
+            direction,
+            fields=DAILY_SORT_FIELDS,
+            text_fields={"name", "category", "branch"},
+            anchor="daily-table",
+        ),
+        sort_by=sort_by,
+        direction=direction,
     )
 
 
@@ -240,13 +299,23 @@ def build_weekly_report(
     product: str = "",
     sort_by: str = "sales_amount",
     direction: str = "desc",
+    day_sort_by: str = "date",
+    day_direction: str = "asc",
     today: date | None = None,
 ) -> WeeklyReport:
     warnings: list[str] = []
     anchor = _date_value(selected_date, today or date.today(), "fecha", warnings)
     iso_year, iso_week = iso_year_and_week(anchor)
     start, end = iso_week_bounds(iso_year, iso_week)
-    sort_by, direction = _safe_sort(sort_by, direction, warnings)
+    sort_by, direction = _safe_product_report_sort(sort_by, direction, warnings)
+    day_sort_by, day_direction = _safe_table_sort(
+        day_sort_by,
+        day_direction,
+        WEEKLY_DAY_SORT_FIELDS,
+        "date",
+        "asc",
+        warnings,
+    )
     context = _context(session, start, end, branch, category, product, warnings)
     context = replace(context, period_label=_week_label(start, end))
     existing = {row.sales_date: row for row in aggregate_daily(session, context.filters)}
@@ -258,22 +327,51 @@ def build_weekly_report(
         existing.get(current, DailyAggregate(current, Metrics()))
         for current in (start + timedelta(days=offset) for offset in range(7))
     )
+    day_rows = tuple(
+        sorted(
+            day_rows,
+            key=lambda row: _daily_sort_value(row, daily_financial, day_sort_by),
+            reverse=day_direction == "desc",
+        )
+    )
+    if sort_by in ALLOWED_PRODUCT_SORTS:
+        product_rows = tuple(
+            aggregate_by_product(
+                session, context.filters, sort_by=sort_by, direction=direction
+            )
+        )
+    else:
+        sorted_financial = profitability_by_product(
+            session, context.filters, sort_by=sort_by, direction=direction
+        )
+        products_by_id = {
+            row.master_product_id: row
+            for row in aggregate_by_product(session, context.filters)
+        }
+        product_rows = tuple(
+            products_by_id[row.master_product_id]
+            for row in sorted_financial
+            if row.master_product_id in products_by_id
+        )
     return WeeklyReport(
         context=context,
         anchor_date=anchor,
         totals=aggregate_totals(session, context.filters),
         day_rows=day_rows,
-        product_rows=tuple(
-            aggregate_by_product(
-                session, context.filters, sort_by=sort_by, direction=direction
-            )
-        ),
-        sort_links=_sort_links(
+        product_rows=product_rows,
+        sort_links=_table_sort_links(
             "/reports/weekly",
             context,
-            {"date": anchor.isoformat()},
+            {
+                "date": anchor.isoformat(),
+                "day_sort": day_sort_by,
+                "day_direction": day_direction,
+            },
             sort_by,
             direction,
+            fields=(*ALLOWED_PRODUCT_SORTS, *ALLOWED_FINANCIAL_SORTS),
+            text_fields={"name", "category"},
+            anchor="weekly-products-table",
         ),
         sort_by=sort_by,
         direction=direction,
@@ -282,6 +380,24 @@ def build_weekly_report(
         product_financial={
             row.master_product_id: row for row in product_financial_rows
         },
+        day_sort_links=_table_sort_links(
+            "/reports/weekly",
+            context,
+            {
+                "date": anchor.isoformat(),
+                "sort": sort_by,
+                "direction": direction,
+            },
+            day_sort_by,
+            day_direction,
+            fields=WEEKLY_DAY_SORT_FIELDS,
+            text_fields=set(),
+            sort_param="day_sort",
+            direction_param="day_direction",
+            anchor="weekly-days-table",
+        ),
+        day_sort_by=day_sort_by,
+        day_direction=day_direction,
     )
 
 
@@ -293,11 +409,16 @@ def build_weekly_history_report(
     category: str = "",
     product: str = "",
     metric: str = "sales_amount",
+    sort_by: str = "period",
+    direction: str = "asc",
     today: date | None = None,
 ) -> HistoryReport:
     warnings: list[str] = []
     selected_year = _year_value(year, (today or date.today()).year, warnings)
     selected_metric = _safe_metric(metric, warnings)
+    sort_by, direction = _safe_table_sort(
+        sort_by, direction, HISTORY_SORT_FIELDS, "period", "asc", warnings
+    )
     last_week = date(selected_year, 12, 28).isocalendar().week
     start, _ = iso_week_bounds(selected_year, 1)
     _, end = iso_week_bounds(selected_year, last_week)
@@ -338,12 +459,31 @@ def build_weekly_history_report(
         )
         for index, point in enumerate(series["total_units"])
     )
+    rows = tuple(
+        sorted(
+            rows,
+            key=lambda row: _history_sort_value(row, sort_by),
+            reverse=direction == "desc",
+        )
+    )
     return HistoryReport(
-        context,
-        selected_year,
-        selected_metric,
-        rows,
-        profitability_totals(session, context.filters),
+        context=context,
+        year=selected_year,
+        metric=selected_metric,
+        rows=rows,
+        financial=profitability_totals(session, context.filters),
+        sort_links=_table_sort_links(
+            "/reports/weekly-history",
+            context,
+            {"year": str(selected_year), "metric": selected_metric},
+            sort_by,
+            direction,
+            fields=HISTORY_SORT_FIELDS,
+            text_fields=set(),
+            anchor="weekly-history-table",
+        ),
+        sort_by=sort_by,
+        direction=direction,
     )
 
 
@@ -355,11 +495,16 @@ def build_monthly_report(
     category: str = "",
     product: str = "",
     metric: str = "sales_amount",
+    sort_by: str = "period",
+    direction: str = "asc",
     today: date | None = None,
 ) -> HistoryReport:
     warnings: list[str] = []
     selected_year = _year_value(year, (today or date.today()).year, warnings)
     selected_metric = _safe_metric(metric, warnings)
+    sort_by, direction = _safe_table_sort(
+        sort_by, direction, HISTORY_SORT_FIELDS, "period", "asc", warnings
+    )
     start, end = date(selected_year, 1, 1), date(selected_year, 12, 31)
     context = _context(session, start, end, branch, category, product, warnings)
     series = {
@@ -394,12 +539,31 @@ def build_monthly_report(
         )
         for index, point in enumerate(series["total_units"])
     )
+    rows = tuple(
+        sorted(
+            rows,
+            key=lambda row: _history_sort_value(row, sort_by),
+            reverse=direction == "desc",
+        )
+    )
     return HistoryReport(
-        context,
-        selected_year,
-        selected_metric,
-        rows,
-        profitability_totals(session, context.filters),
+        context=context,
+        year=selected_year,
+        metric=selected_metric,
+        rows=rows,
+        financial=profitability_totals(session, context.filters),
+        sort_links=_table_sort_links(
+            "/reports/monthly",
+            context,
+            {"year": str(selected_year), "metric": selected_metric},
+            sort_by,
+            direction,
+            fields=HISTORY_SORT_FIELDS,
+            text_fields=set(),
+            anchor="monthly-table",
+        ),
+        sort_by=sort_by,
+        direction=direction,
     )
 
 
@@ -412,12 +576,22 @@ def build_products_report(
     category: str = "",
     sort_by: str = "sales_amount",
     direction: str = "desc",
+    category_sort_by: str = "category",
+    category_direction: str = "asc",
     today: date | None = None,
 ) -> ProductsReport:
     warnings: list[str] = []
     current = today or date.today()
     start, end = _date_range_values(date_from, date_to, current.replace(day=1), current, warnings)
     sort_by, direction = _safe_product_report_sort(sort_by, direction, warnings)
+    category_sort_by, category_direction = _safe_table_sort(
+        category_sort_by,
+        category_direction,
+        CATEGORY_SORT_FIELDS,
+        "category",
+        "asc",
+        warnings,
+    )
     context = _context(session, start, end, branch, category, "", warnings)
     if sort_by in ALLOWED_PRODUCT_SORTS:
         rows = tuple(
@@ -439,15 +613,56 @@ def build_products_report(
             for row in financial_rows
             if row.master_product_id in sales_by_id
         )
+    category_rows = tuple(
+        sorted(
+            profitability_by_category(session, context.filters),
+            key=lambda row: _category_sort_value(row, category_sort_by),
+            reverse=category_direction == "desc",
+        )
+    )
     return ProductsReport(
         context=context,
         totals=aggregate_totals(session, context.filters),
         rows=rows,
         sort_by=sort_by,
         direction=direction,
+        sort_links=_table_sort_links(
+            "/reports/products",
+            context,
+            {
+                "date_from": start.isoformat(),
+                "date_to": end.isoformat(),
+                "category_sort": category_sort_by,
+                "category_direction": category_direction,
+            },
+            sort_by,
+            direction,
+            fields=(*ALLOWED_PRODUCT_SORTS, *ALLOWED_FINANCIAL_SORTS),
+            text_fields={"name", "category"},
+            anchor="products-table",
+        ),
         financial=profitability_totals(session, context.filters),
         product_financial={row.master_product_id: row for row in financial_rows},
-        category_financial=tuple(profitability_by_category(session, context.filters)),
+        category_financial=category_rows,
+        category_sort_links=_table_sort_links(
+            "/reports/products",
+            context,
+            {
+                "date_from": start.isoformat(),
+                "date_to": end.isoformat(),
+                "sort": sort_by,
+                "direction": direction,
+            },
+            category_sort_by,
+            category_direction,
+            fields=CATEGORY_SORT_FIELDS,
+            text_fields={"category"},
+            sort_param="category_sort",
+            direction_param="category_direction",
+            anchor="categories-table",
+        ),
+        category_sort_by=category_sort_by,
+        category_direction=category_direction,
     )
 
 
@@ -459,21 +674,50 @@ def build_branches_report(
     category: str = "",
     product: str = "",
     metric: str = "sales_amount",
+    sort_by: str = "position",
+    direction: str = "asc",
     today: date | None = None,
 ) -> BranchesReport:
     warnings: list[str] = []
     current = today or date.today()
     start, end = _date_range_values(date_from, date_to, current.replace(day=1), current, warnings)
     selected_metric = _safe_metric(metric, warnings)
+    sort_by, direction = _safe_table_sort(
+        sort_by, direction, BRANCH_ALLOWED_SORT_FIELDS, "position", "asc", warnings
+    )
     context = _context(session, start, end, "", category, product, warnings)
     branch_financial_rows = profitability_by_branch(session, context.filters)
+    branch_financial = {row.branch_id: row for row in branch_financial_rows}
+    rows = tuple(
+        sorted(
+            aggregate_by_branch(session, context.filters),
+            key=lambda row: _branch_sort_value(row, branch_financial, sort_by),
+            reverse=direction == "desc",
+        )
+    )
     return BranchesReport(
         context=context,
         totals=aggregate_totals(session, context.filters),
         metric=selected_metric,
-        rows=tuple(aggregate_by_branch(session, context.filters)),
+        rows=rows,
         financial=profitability_totals(session, context.filters),
-        branch_financial={row.branch_id: row for row in branch_financial_rows},
+        branch_financial=branch_financial,
+        sort_links=_table_sort_links(
+            "/reports/branches",
+            context,
+            {
+                "date_from": start.isoformat(),
+                "date_to": end.isoformat(),
+                "metric": selected_metric,
+            },
+            sort_by,
+            direction,
+            fields=BRANCH_SORT_FIELDS,
+            text_fields={"branch"},
+            anchor="branches-table",
+        ),
+        sort_by=sort_by,
+        direction=direction,
     )
 
 
@@ -724,19 +968,122 @@ def _safe_product_report_sort(
     return sort_by, direction
 
 
-def _sort_links(path: str, context: ReportContext, extra: dict[str, str], current: str, direction: str) -> dict[str, str]:
+def _safe_table_sort(
+    sort_by: str,
+    direction: str,
+    allowed: tuple[str, ...],
+    default_sort: str,
+    default_direction: str,
+    warnings: list[str],
+) -> tuple[str, str]:
+    if sort_by not in allowed or direction not in {"asc", "desc"}:
+        warnings.append("El orden no era válido y se restableció.")
+        return default_sort, default_direction
+    return sort_by, direction
+
+
+def _financial_table_sort_value(financial: FinancialMetrics, field: str) -> Decimal:
+    if field == "known_margin_percent":
+        return financial.known_margin_percent or ZERO
+    if field == "coverage_percent":
+        return financial.sales_coverage_percent or ZERO
+    return getattr(financial, field)
+
+
+def _product_branch_sort_value(
+    row: ProductBranchAggregate,
+    financial: dict[tuple[int, int], ProductBranchProfitability],
+    field: str,
+) -> object:
+    if field == "name":
+        return row.product_name.casefold()
+    if field == "category":
+        return row.category_name.casefold()
+    if field == "branch":
+        return row.branch_name.casefold()
+    if field == "observed_price":
+        return max(row.observed_sale_prices, default=ZERO)
+    if field in ALLOWED_METRICS:
+        return getattr(row.metrics, field)
+    return _financial_table_sort_value(
+        financial[(row.master_product_id, row.branch_id)].financial, field
+    )
+
+
+def _daily_sort_value(
+    row: DailyAggregate,
+    financial: dict[date, DailyProfitability],
+    field: str,
+) -> object:
+    if field == "date":
+        return row.sales_date
+    if field in ALLOWED_METRICS:
+        return getattr(row.metrics, field)
+    finance = financial.get(row.sales_date)
+    return _financial_table_sort_value(
+        finance.financial if finance else FinancialMetrics(), field
+    )
+
+
+def _history_sort_value(row: TimeMetricsRow, field: str) -> object:
+    if field == "period":
+        return row.period_start
+    if field in ALLOWED_METRICS:
+        return getattr(row.metrics, field)
+    return _financial_table_sort_value(row.financial, field)
+
+
+def _category_sort_value(row: CategoryProfitability, field: str) -> object:
+    if field == "category":
+        return row.category_name.casefold()
+    if field == "sales_amount":
+        return row.sales_metrics.sales_amount
+    return _financial_table_sort_value(row.financial, field)
+
+
+def _branch_sort_value(
+    row: BranchAggregate,
+    financial: dict[int, BranchProfitability],
+    field: str,
+) -> object:
+    if field == "position":
+        return row.branch_id
+    if field == "branch":
+        return row.branch_name.casefold()
+    if field in ALLOWED_METRICS:
+        return getattr(row.metrics, field)
+    return _financial_table_sort_value(financial[row.branch_id].financial, field)
+
+
+def _table_sort_links(
+    path: str,
+    context: ReportContext,
+    extra: dict[str, str],
+    current: str,
+    direction: str,
+    *,
+    fields: tuple[str, ...],
+    text_fields: set[str],
+    sort_param: str = "sort",
+    direction_param: str = "direction",
+    anchor: str = "",
+) -> dict[str, str]:
     result: dict[str, str] = {}
-    for field in ALLOWED_PRODUCT_SORTS:
-        next_direction = "asc" if current != field or direction == "desc" else "desc"
+    for field in fields:
+        if current == field:
+            next_direction = "asc" if direction == "desc" else "desc"
+        else:
+            next_direction = "asc" if field in text_fields else "desc"
         params = {
             **extra,
             "branch": context.filters.branch_id or "",
             "category": context.filters.category_id or "",
             "product": context.filters.master_product_id or "",
-            "sort": field,
-            "direction": next_direction,
+            sort_param: field,
+            direction_param: next_direction,
         }
-        result[field] = f"{path}?{urlencode(params)}"
+        fragment = f"#{anchor}" if anchor else ""
+        result[field] = f"{path}?{urlencode(params)}{fragment}"
     return result
 
 

@@ -12,4 +12,4 @@
     {% for row in report.rows %}<tr><td><strong>Semana {{ "%02d"|format(row.number) }}</strong></td><td>{{ row.period_start|date_mx }} - {{ row.period_end|date_mx }}</td>{{ ui.metric_cells(row.metrics) }}{{ ui.financial_cells(row.financial) }}</tr>{% endfor %}
   </tbody></table></div></section>
 {% endblock %}
-{% block scripts %}<script id="dashboard-chart-data" type="application/json">{{ report.chart_json|tojson }}</script><script src="{{ url_for('static', path='/js/dashboard.js') }}"></script>{% endblock %}
+{% block scripts %}<script id="dashboard-chart-data" type="application/json">{{ report.chart_json|tojson }}</script><script src="{{ url_for('static', path='/js/dashboard.js') }}?v={{ asset_version('js/dashboard.js') }}"></script>{% endblock %}

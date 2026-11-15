@@ -23,7 +23,7 @@ from app.services.reporting_service import (
 )
 
 EXCEL_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-QUANTITY_FORMAT = "#,##0.######"
+QUANTITY_FORMAT = "#,##0"
 MONEY_FORMAT = '$#,##0.00'
 PERCENT_FORMAT = "0.00%"
 DATE_FORMAT = "dd/mm/yyyy"

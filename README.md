@@ -13,11 +13,12 @@ Las **Etapas 0 a 12** están activas:
 - productos maestros independientes de los IDs externos;
 - equivalencias de producto por sucursal;
 - página de inspección del catálogo en `/products`.
-- carga manual de reportes `.xlsx` y `.xlsm` en `/imports/new`;
+- carga diaria de una a cuatro sucursales y carga semanal de hasta 28 reportes
+  `.xlsx` o `.xlsm` en `/imports/new`;
 - preservación del archivo original, SHA-256 y todas las filas crudas;
 - incidencias básicas de estructura y contenido;
 - detección de duplicados por fecha, sucursal y archivo;
-- historial mínimo de cargas en `/imports`.
+- historial de cargas agrupado por fecha en `/imports`.
 - detección de productos locales todavía desconocidos;
 - sugerencias deterministas y búsqueda manual de productos existentes;
 - confirmación persistente de equivalencias por sucursal;
@@ -60,8 +61,12 @@ Las **Etapas 0 a 12** están activas:
 - launcher local con health check, apertura automática del navegador, instancia
   única y apagado limpio desde la interfaz.
 
-El constructor libre de reportes, el ejecutable final y el instalador permanecen
-fuera del flujo activo hasta sus etapas correspondientes.
+El constructor libre de reportes permanece fuera del flujo activo. El ejecutable
+final y el instalador aún requieren el build y QA descritos a continuación.
+
+La configuración reproducible de Etapa 13 está preparada para producir la
+versión MVP `0.1.0` en Windows. El `.exe` y el instalador solo se consideran
+aprobados después de compilar y completar QA en Windows 10/11 de 64 bits.
 
 ## Requisitos
 
@@ -115,6 +120,31 @@ Abrir <http://127.0.0.1:8000>. El diagnóstico está disponible en
 La base de desarrollo se crea en `data/app.db` y los logs se escriben en
 `data/logs/app.log`. Ambos son archivos locales ignorados por Git.
 
+## Build y distribución Windows
+
+El build oficial utiliza PyInstaller 6.21.0 en modo `onedir`, sin consola, con
+nombre `ConcentradoVentas.exe`. Debe ejecutarse en Windows 10/11 de 64 bits;
+PyInstaller no genera un binario Windows válido desde macOS.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
+powershell -ExecutionPolicy Bypass -File packaging\windows\build-installer.ps1
+```
+
+El primer comando crea el entorno de build, empaqueta templates y recursos
+locales, genera metadatos desde la versión central y ejecuta un smoke test. El
+segundo utiliza Inno Setup 6 para generar el instalador con acceso en menú Inicio
+y opción de acceso directo en el escritorio.
+
+Las instrucciones técnicas completas están en
+`packaging/windows/README.md`; la validación de release está en
+`packaging/windows/TEST_CHECKLIST.md`. La guía no técnica se encuentra en
+`docs/GUIA_USUARIO.md`.
+
+El usuario final no necesita Python ni conexión a internet. Un ejecutable sin
+firma puede mostrar una advertencia de SmartScreen; esta etapa no intenta
+evadirla ni incluye firma de código.
+
 ## Pruebas
 
 ```bash
@@ -129,15 +159,17 @@ productos y el procesamiento normalizado.
 
 ## Flujo de uso
 
-1. Abrir **Cargar ventas**, elegir la fecha de ventas y una de las cuatro
-   sucursales, y procesar el archivo Excel.
-2. Si aparecen productos nuevos, relacionarlos con un producto conocido o
-   registrarlos con nombre y categoría.
-3. Consultar las ventas normalizadas en el dashboard y los reportes.
-4. Cargar costos oficiales con su fecha de vigencia desde **Costos**.
-5. Revisar costo, utilidad, margen y cobertura; una cobertura incompleta se
+1. Abrir **Cargar ventas** y elegir **Carga diaria** para procesar de una a
+   cuatro sucursales, o **Carga semanal** para seleccionar hasta 28 archivos.
+2. En la carga semanal, elegir una fecha de la semana; la fecha y sucursal de
+   cada archivo se identifican mediante su nombre.
+3. Si aparecen productos nuevos, confirmar juntas las coincidencias exactas y
+   revisar únicamente los casos que realmente sean ambiguos.
+4. Consultar las ventas normalizadas en el dashboard y los reportes.
+5. Cargar costos oficiales con su fecha de vigencia desde **Costos**.
+6. Revisar costo, utilidad, margen y cobertura; una cobertura incompleta se
    identifica como utilidad parcial.
-6. Exportar el reporte visible a Excel cuando se necesite compartirlo.
+7. Exportar el reporte visible a Excel cuando se necesite compartirlo.
 
 El historial conserva cada carga y sus incidencias. Recargar una página no
 repite el procesamiento, y un archivo duplicado para la misma fecha y sucursal
@@ -164,8 +196,14 @@ de venta individual ni unidades combo.
 Una carga con IDs locales desconocidos queda en “Productos por confirmar”. El
 usuario puede relacionar cada producto con uno existente o crear un producto
 maestro nuevo. La decisión se guarda por sucursal e ID local, por lo que futuras
-cargas reutilizan la equivalencia sin volver a preguntar. Las sugerencias nunca
-crean relaciones automáticamente.
+cargas reutilizan la equivalencia sin volver a preguntar. Las coincidencias con
+el mismo nombre y categoría pueden confirmarse juntas; una decisión nueva
+reprocesa todos los días pendientes de esa sucursal. Las sugerencias ambiguas
+nunca crean relaciones automáticamente.
+
+Las filas con precio de venta cero o ilegible no requieren homologación porque
+no pueden producir una venta normalizada. Se conservan con su nombre original
+como incidencias y no bloquean el resto del archivo.
 
 ## Normalización de ventas
 
@@ -316,8 +354,17 @@ usuario elija; no forman parte del respaldo interno. Si se usa un `.env`, debe
 resguardarse por separado y nunca publicarse porque puede contener configuración
 sensible.
 
-El sistema es local y no incluye todavía backup automático, sincronización en
-la nube, usuarios, ejecutable final ni instalador. Tampoco asigna el ingreso de
-un combo entre sus componentes. Cuando falta un costo oficial, la venta
+En la distribución Windows la ubicación equivalente y persistente es:
+
+```text
+%LOCALAPPDATA%\ConcentradoVentas\
+```
+
+El instalador escribe los binarios en una carpeta separada y la desinstalación
+no elimina esta información.
+
+El sistema es local y no incluye backup automático, sincronización en la nube,
+usuarios, actualización automática ni firma de código. Tampoco asigna el ingreso
+de un combo entre sus componentes. Cuando falta un costo oficial, la venta
 permanece visible, pero costo, utilidad y margen se presentan como no disponibles
 y la cobertura deja claro que el resultado financiero es parcial.

@@ -33,6 +33,25 @@
   </select></label>
 {% endmacro %}
 
+{% macro sortable_header(links, current, direction, field, label, numeric=false) %}
+  {% set active = current == field %}
+  {% if active and direction == 'asc' %}
+    {% set arrow = '▲' %}
+    {% set current_order = 'A a Z' if field in ['name', 'category'] else 'menor a mayor' %}
+  {% elif active %}
+    {% set arrow = '▼' %}
+    {% set current_order = 'Z a A' if field in ['name', 'category'] else 'mayor a menor' %}
+  {% else %}
+    {% set arrow = '↕' %}
+    {% set current_order = 'sin aplicar' %}
+  {% endif %}
+  <th{% if numeric %} class="number-cell"{% endif %} aria-sort="{{ 'ascending' if active and direction == 'asc' else 'descending' if active else 'none' }}">
+    <a class="sort-link{% if active %} sort-link-active{% endif %}" href="{{ links[field] }}" title="Orden actual: {{ current_order }}. Presione para cambiar.">
+      <span>{{ label }}</span><span class="sort-arrow" aria-hidden="true">{{ arrow }}</span>
+    </a>
+  </th>
+{% endmacro %}
+
 {% macro apply_actions(export_path="") %}
   <div class="filter-actions"><button class="button button-primary" type="submit">Consultar reporte</button>{% if export_path %}<button class="button button-secondary" type="submit" formaction="{{ export_path }}">Exportar a Excel</button>{% endif %}</div>
 {% endmacro %}
@@ -45,7 +64,7 @@
     <div><span>Producto</span><strong>{{ context.product_name }}</strong></div>
   </section>
   {% if context.warning %}<div class="alert alert-error" role="alert">{{ context.warning }}</div>{% endif %}
-  {% if context.issue_summary.raw_rows_with_issues %}<aside class="report-notice" role="status">Este periodo contiene registros con incidencias. <a href="/imports">Revisar historial</a></aside>{% endif %}
+  {% if context.issue_summary.raw_rows_with_issues %}<aside class="report-notice" role="status">Este periodo contiene registros con incidencias (datos para revisar): {{ context.issue_summary.raw_rows_with_issues }}. <a href="/imports">Ver detalles</a></aside>{% endif %}
   {% if context.pending_batches %}<aside class="report-notice report-notice-warning" role="status">Hay cargas pendientes de confirmar que todavía no están incluidas en este reporte. <a href="/imports">Revisar cargas</a></aside>{% endif %}
 {% endmacro %}
 

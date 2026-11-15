@@ -24,7 +24,8 @@
   const numberFormat = new Intl.NumberFormat("es-MX", {
     style: money ? "currency" : "decimal",
     currency: money ? "MXN" : undefined,
-    maximumFractionDigits: money ? 2 : 4,
+    minimumFractionDigits: money ? 2 : 0,
+    maximumFractionDigits: money ? 2 : 0,
   });
 
   function prepareCanvas(canvas) {
@@ -61,12 +62,33 @@
     }
   }
 
+  function chartPadding(context, width, dataset, maxValue, bottom) {
+    const axisLabels = [0, 0.25, 0.5, 0.75, 1].map((ratio) =>
+      numberFormat.format(maxValue * ratio),
+    );
+    const widestAxisLabel = Math.max(
+      ...axisLabels.map((label) => context.measureText(label).width),
+      0,
+    );
+    const firstLabel = String(dataset.labels[0] || "");
+    const lastLabel = String(dataset.labels[dataset.labels.length - 1] || "");
+    const firstHalf = context.measureText(firstLabel).width / 2;
+    const lastHalf = context.measureText(lastLabel).width / 2;
+
+    return {
+      top: 24,
+      left: Math.min(Math.max(widestAxisLabel + 18, firstHalf + 12), width * 0.38),
+      right: Math.min(Math.max(lastHalf + 12, 24), width * 0.25),
+      bottom,
+    };
+  }
+
   function drawLineChart(canvas, dataset) {
     const values = dataset.values.map(Number);
     const { context, width, height } = prepareCanvas(canvas);
     if (!values.length) return drawEmpty(context, width, height);
-    const padding = { top: 24, right: 24, bottom: 52, left: 78 };
     const maxValue = Math.max(...values, 0) || 1;
+    const padding = chartPadding(context, width, dataset, maxValue, 52);
     drawAxes(context, width, height, padding, maxValue);
     const plotWidth = width - padding.left - padding.right;
     const plotHeight = height - padding.top - padding.bottom;
@@ -105,8 +127,8 @@
     const values = dataset.values.map(Number);
     const { context, width, height } = prepareCanvas(canvas);
     if (!values.length) return drawEmpty(context, width, height);
-    const padding = { top: 24, right: 24, bottom: 64, left: 78 };
     const maxValue = Math.max(...values, 0) || 1;
+    const padding = chartPadding(context, width, dataset, maxValue, 64);
     drawAxes(context, width, height, padding, maxValue);
     const plotWidth = width - padding.left - padding.right;
     const plotHeight = height - padding.top - padding.bottom;

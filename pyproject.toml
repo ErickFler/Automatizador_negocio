@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sistema-concentrado-ventas"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Aplicacion local para concentrar reportes de ventas."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,7 +26,7 @@ dev = [
     "pytest>=8.3,<9.0",
 ]
 packaging = [
-    "pyinstaller>=6.12,<7.0",
+    "pyinstaller==6.21.0",
 ]
 
 [tool.pytest.ini_options]
@@ -35,3 +35,6 @@ addopts = "-ra"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "app.__version__"}

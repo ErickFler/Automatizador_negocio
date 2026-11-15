@@ -12,6 +12,7 @@ from app.db.models import (
     SaleRecord,
 )
 from app.domain.calculations import calculate_units
+from app.domain.import_policy import requires_product_mapping
 from app.services.numeric_parser import DecimalParseResult, parse_decimal
 from app.services.raw_import_service import (
     COMPLETED,
@@ -97,11 +98,16 @@ def process_normalized_sales_batch(
     )
     session.flush()
 
-    unmapped_rows = [
-        row
-        for row in raw_rows
-        if (row.external_product_id or "").strip() not in branch_products
-    ]
+    unmapped_rows = []
+    for row in raw_rows:
+        sale_price = parse_decimal(row.sale_price_raw)
+        if (
+            (row.external_product_id or "").strip() not in branch_products
+            and requires_product_mapping(
+                sale_price.value if sale_price.is_valid else None
+            )
+        ):
+            unmapped_rows.append(row)
     if unmapped_rows:
         session.execute(
             delete(SaleRecord).where(SaleRecord.import_batch_id == batch_id)
@@ -135,7 +141,6 @@ def process_normalized_sales_batch(
     skipped_rows = 0
 
     for row in raw_rows:
-        branch_product = branch_products[(row.external_product_id or "").strip()]
         total_units = parse_decimal(row.quantity_raw)
         sale_price = parse_decimal(row.sale_price_raw)
         sales_amount = parse_decimal(row.total_amount_raw)
@@ -206,6 +211,14 @@ def process_normalized_sales_batch(
                 session.delete(existing)
             skipped_rows += 1
             continue
+
+        branch_product = branch_products.get(
+            (row.external_product_id or "").strip()
+        )
+        if branch_product is None:
+            raise RuntimeError(
+                "Una fila procesable no cuenta con homologación de producto."
+            )
 
         calculation = calculate_units(
             total_units=total_units.value,

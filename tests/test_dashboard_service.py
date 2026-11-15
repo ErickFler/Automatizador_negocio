@@ -445,9 +445,11 @@ def test_table_headers_use_safe_service_sort_links(
     assert response.status_code == 200
     assert "se ordenó por Venta $" in response.text
     assert "sort=total_units" in response.text
+    assert "sort=category" in response.text
     assert "sort=individual_sale_units" in response.text
     assert "sort=combo_units" in response.text
     assert "sort=sales_amount" in response.text
+    assert 'aria-sort="descending"' in response.text
 
 
 def _chart_json(html: str) -> dict[str, object]:

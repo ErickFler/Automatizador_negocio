@@ -3,38 +3,150 @@
 {% block title %}Cargar ventas · Concentrado de Ventas{% endblock %}
 
 {% block content %}
-  <section class="hero compact">
+  <section class="hero compact upload-hero">
     <div>
       <p class="eyebrow">Nueva carga</p>
       <h1>Cargar ventas</h1>
-      <p class="hero-copy">Selecciona manualmente la fecha y la sucursal del reporte.</p>
+      <p class="hero-copy">Elija si desea cargar un día o una semana completa.</p>
     </div>
   </section>
 
   {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
 
-  <form class="panel upload-form" action="/imports" method="post" enctype="multipart/form-data">
-    <div class="upload-list">
-      <div class="upload-card">
-        <label>
-          <span>Fecha de ventas</span>
-          <input type="date" name="sales_date" required>
-        </label>
-        <label>
-          <span>Sucursal</span>
-          <select name="branch_id" required>
-            <option value="">Selecciona una sucursal</option>
-            {% for branch in branches %}<option value="{{ branch.id }}">{{ branch.name }}</option>{% endfor %}
-          </select>
-        </label>
-        <label class="file-field">
-          <span>Archivo Excel</span>
-          <input type="file" name="file" accept=".xlsx,.xlsm" required>
-        </label>
+  <section class="upload-mode-picker" aria-label="Tipo de carga">
+    <button class="upload-mode-card is-active" type="button" data-upload-mode="daily" aria-pressed="true">
+      <span class="upload-mode-number">1 día</span>
+      <strong>Carga diaria</strong>
+      <small>Seleccione entre una y cuatro sucursales.</small>
+    </button>
+    <button class="upload-mode-card" type="button" data-upload-mode="weekly" aria-pressed="false">
+      <span class="upload-mode-number">7 días</span>
+      <strong>Carga semanal</strong>
+      <small>Organice hasta 28 archivos por día y sucursal.</small>
+    </button>
+  </section>
+
+  <form id="daily-upload-form" class="panel upload-form" action="/imports" method="post" enctype="multipart/form-data" data-upload-panel="daily">
+    <div class="upload-heading">
+      <label class="upload-date-field" for="sales-date">
+        <span>Fecha de ventas</span>
+        <input id="sales-date" type="date" name="sales_date" required>
+      </label>
+      <div class="upload-instructions">
+        <strong>Agregue los archivos disponibles</strong>
+        <span>Puede cargar de una a cuatro sucursales. Los archivos faltantes se pueden agregar después.</span>
       </div>
     </div>
+
+    <div class="upload-list">
+      {% for branch in branches %}
+        <div class="upload-card" data-daily-upload-card>
+          <span class="upload-number" aria-hidden="true">{{ loop.index }}</span>
+          <div class="upload-branch">
+            <span>Sucursal</span>
+            <strong>{{ branch.name }}</strong>
+            <input type="hidden" name="branch_id" value="{{ branch.id }}" data-branch-input>
+          </div>
+          <label class="file-field">
+            <span>Archivo Excel de {{ branch.name }}</span>
+            <input type="file" name="file" accept=".xlsx,.xlsm" data-daily-file>
+          </label>
+          <div class="upload-card-status">
+            <span class="file-ready-state" data-file-state>Falta archivo</span>
+            <span class="existing-load-state" data-existing-state hidden>Ya existe una carga</span>
+            <label class="replace-load-control" data-replace-control hidden>
+              <input type="checkbox" data-replace-checkbox>
+              <span>Reemplazar la carga anterior</span>
+            </label>
+            <input type="hidden" name="replace_existing" value="false" data-replace-value>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
     <div class="form-actions">
-      <button class="button button-primary" type="submit">Procesar archivo</button>
+      <p class="upload-help">Formatos admitidos: .xlsx y .xlsm</p>
+      <button id="submit-daily-upload" class="button button-primary button-large" type="submit" disabled>Procesar día</button>
+    </div>
+    <div class="upload-progress" data-upload-progress hidden role="status" aria-live="assertive">
+      <strong>Procesando los archivos…</strong>
+      <span>No cierre esta ventana. Al terminar verá el resultado.</span>
+      <span class="progress-track" aria-hidden="true"><span></span></span>
     </div>
   </form>
+
+  <form id="weekly-upload-form" class="panel upload-form" action="/imports/weekly" method="post" enctype="multipart/form-data" data-upload-panel="weekly" hidden>
+    <div class="weekly-upload-intro">
+      <div>
+        <p class="eyebrow">Semana completa</p>
+        <h2>Una casilla por día y sucursal</h2>
+        <p>Seleccione cada archivo en su lugar. No necesita cambiarle el nombre.</p>
+      </div>
+      <label class="upload-date-field" for="week-date">
+        <span>Una fecha dentro de la semana</span>
+        <input id="week-date" type="date" name="week_date" required>
+      </label>
+    </div>
+
+    <div id="weekly-file-summary" class="weekly-file-summary" role="status" aria-live="polite">
+      Seleccione una fecha para preparar la semana.
+    </div>
+
+    <div class="weekly-grid-wrap">
+      <table class="weekly-upload-grid">
+        <thead>
+          <tr>
+            <th>Día</th>
+            {% for branch in branches %}<th>{{ branch.name }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% set day_names = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] %}
+          {% for day_index in range(7) %}
+            <tr data-week-row="{{ day_index }}">
+              <th scope="row">
+                <strong>{{ day_names[day_index] }}</strong>
+                <span data-week-day-label>Seleccione fecha</span>
+                <small data-day-count>0 de 4 listos</small>
+              </th>
+              {% for branch in branches %}
+                <td>
+                  <div class="weekly-slot" data-weekly-slot data-day-index="{{ day_index }}" data-branch-id="{{ branch.id }}">
+                    <label class="weekly-slot-picker">
+                      <span class="visually-hidden">Archivo de {{ branch.name }} para {{ day_names[day_index] }}</span>
+                      <strong data-slot-action>Elegir archivo</strong>
+                      <small data-slot-filename>Ningún archivo</small>
+                      <input type="file" name="files" accept=".xlsx,.xlsm" data-weekly-file>
+                    </label>
+                    <span class="weekly-slot-state" data-slot-state>Falta</span>
+                    <span class="existing-load-state" data-existing-state hidden>Ya cargado</span>
+                    <label class="replace-load-control" data-replace-control hidden>
+                      <input type="checkbox" data-replace-checkbox>
+                      <span>Reemplazar anterior</span>
+                    </label>
+                    <input type="hidden" name="slot_date" data-slot-date>
+                    <input type="hidden" name="slot_branch_id" value="{{ branch.id }}" data-slot-branch>
+                    <input type="hidden" name="replace_existing" value="false" data-replace-value>
+                  </div>
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="form-actions">
+      <p class="upload-help">Puede cargar un solo archivo o completar los 28.</p>
+      <button id="submit-weekly-upload" class="button button-primary button-large" type="submit" disabled>Procesar semana</button>
+    </div>
+    <div class="upload-progress" data-upload-progress hidden role="status" aria-live="assertive">
+      <strong>Procesando la semana…</strong>
+      <span>No cierre esta ventana. Los archivos se procesan uno por uno.</span>
+      <span class="progress-track" aria-hidden="true"><span></span></span>
+    </div>
+  </form>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', path='/js/uploads.js') }}?v={{ asset_version('js/uploads.js') }}"></script>
 {% endblock %}

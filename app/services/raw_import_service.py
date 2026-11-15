@@ -15,6 +15,7 @@ from app.db.models import (
     RawSaleRecord,
 )
 from app.domain.normalization import normalize_for_comparison
+from app.domain.import_policy import requires_product_mapping
 from app.services.duplicate_service import ensure_import_is_not_duplicate
 from app.services.excel_reader import (
     ExcelValidationError,
@@ -167,7 +168,11 @@ def import_raw_sales_file(
 
                 external_id = (row.external_product_id or "").strip()
                 known_product = known_products.get(external_id)
-                if external_id and known_product is None:
+                if (
+                    external_id
+                    and known_product is None
+                    and requires_product_mapping(row.sale_price)
+                ):
                     unknown_external_ids.add(external_id)
                 elif known_product is not None:
                     change_issues = _known_product_change_issues(
